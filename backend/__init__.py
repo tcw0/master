@@ -1,0 +1,1 @@
+"""DDD Pipeline Backend Application."""

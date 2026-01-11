@@ -1,0 +1,1 @@
+"""DDD Pipeline Application Module."""
