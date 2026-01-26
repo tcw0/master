@@ -60,7 +60,7 @@ Thumbs.db
 # =============================================================================
 # Experiments and outputs
 */output/
-*/references/
+*context.txt
 
 # Test artifacts
 .pytest_cache/

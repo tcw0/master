@@ -1,24 +1,100 @@
-For each Bounded Context, let's design the Aggregates:
+Task: Design Aggregates for Each Bounded Context
 
-1. Identify Aggregate Roots (entities that control access)
-2. For each Aggregate:
-   - Define its consistency boundary
-   - List all entities and value objects within it
-   - Identify its invariants (business rules it must protect)
-   - Define its domain events
-   - Specify its commands/methods
-3. Ensure aggregates are:
-   - Small (for concurrency)
-   - Focused on a single consistency boundary
-   - Protecting clear business invariants
+Based on the glossary, event storming, and bounded contexts, design the aggregates with clear consistency boundaries.
 
-Template:
-Aggregate: [Name]
-- Root Entity: [Entity]
-- Contains: [Entities & Value Objects]
-- Invariants: [Business rules]
-- Commands: [Operations]
-- Events: [What it publishes]
-- Size concern: [Evaluation]
+## Ubiquitous Language Glossary (from Phase 1)
 
-Challenge any aggregate that seems too large or has unclear boundaries.
+{glossary}
+
+## Event Storming Results (from Phase 2)
+
+{events}
+
+## Bounded Contexts (from Phase 3)
+
+{bounded_contexts}
+
+## Instructions
+
+### 1. Design Each Aggregate
+For each aggregate identified in the bounded contexts:
+
+**Basic Information:**
+- **name**: Aggregate name in PascalCase (e.g., 'Booking', 'Room')
+- **description**: Purpose of this aggregate
+- **bounded_context**: Which context it belongs to
+- **root_entity**: Name of the aggregate root entity
+- **identity**: The identity attribute (name, type, description)
+
+**Root Attributes:**
+List attributes of the aggregate root (excluding identity):
+- **name**: Attribute name in camelCase
+- **type**: Data type (string, DateTime, or custom type name)
+- **is_required**: Whether required
+- **description**: Business meaning (optional)
+
+**Contained Elements:**
+
+*Entities* (child entities with identity, lifecycle controlled by root):
+- **name**: Entity name
+- **description**: What it represents
+- **identity_attribute**: What uniquely identifies it
+- **attributes**: List of attributes
+- **value_objects**: VOs used by this entity
+- **relationship_to_root**: How it relates to the root
+
+*Value Objects* (immutable, identity-less):
+- **name**: VO name (e.g., 'TimeSlot', 'EmailAddress')
+- **description**: What it represents
+- **attributes**: Attributes that define it
+- **validation_rules**: Rules for validity
+- **is_reusable**: Whether used across aggregates
+
+*Enums* (fixed set of values):
+- **name**: Enum name (e.g., 'BookingStatus')
+- **description**: What it represents
+- **values**: List of values in UPPER_SNAKE_CASE
+
+**Behavior:**
+
+*Invariants* (business rules to protect):
+- **name**: Short invariant name
+- **description**: The business rule in plain language
+- **enforcement**: How it's enforced
+
+*Commands* (operations the aggregate handles):
+- **name**: Command name (e.g., 'createBooking', 'cancel')
+- **description**: What it does
+- **parameters**: Input parameters
+- **preconditions**: What must be true before
+- **postconditions**: State after success
+- **events_raised**: Events produced
+- **exceptions**: Errors that can occur
+
+*Domain Events* (events this aggregate publishes):
+- List of event names
+
+**Design Evaluation:**
+- **consistency_boundary**: What's consistent within this aggregate
+- **size_evaluation**: 'appropriate', 'possibly_too_large', 'possibly_too_small'
+- **size_notes**: Recommendations if concerns exist
+- **references_aggregates**: Other aggregates referenced by ID
+
+### 2. Shared Value Objects
+List VOs used across multiple aggregates
+
+### 3. Cross-Aggregate Interactions
+Document event-based interactions between aggregates:
+- **source_aggregate**: Publisher
+- **event**: Event name
+- **target_aggregate**: Reactor
+- **reaction**: What happens
+- **consistency**: 'eventual' or 'saga'
+
+### 4. Design Concerns
+List any aggregates that may need restructuring
+
+### 5. Missing Invariants
+Note business rules not yet covered
+
+Ensure aggregates are small (for concurrency), focused on a single consistency boundary, and protect clear business invariants.

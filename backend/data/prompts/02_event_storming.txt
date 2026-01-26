@@ -1,15 +1,70 @@
-Based on the ubiquitous language we've established, let's conduct an Event Storming session:
+Task: Conduct Event Storming Analysis
 
-1. Identify all Domain Events (things that happen) in chronological order
-2. For each event, identify:
-   - The Command that triggers it
-   - The Actor/Role who initiates the command
-   - Any Policies/Rules that apply
-   - The Aggregate that handles it
-3. Look for temporal boundaries and parallel processes
-4. Create a visual flow showing the event stream
+Based on the requirements and the ubiquitous language glossary, conduct an Event Storming session to identify domain events, commands, actors, and policies.
 
-Format as:
-Actor -> Command -> Aggregate -> Event(s) -> Policy/Reaction -> Next Command
+## Requirements Document
 
-Highlight any areas where the flow seems unclear or where multiple interpretations exist.
+{requirements}
+
+## Ubiquitous Language Glossary (from Phase 1)
+
+{glossary}
+
+## Instructions
+
+### 1. Identify Actors
+List all actors/roles that interact with the system:
+- **name**: Actor name (e.g., 'Guest', 'Admin', 'PaymentGateway')
+- **type**: One of 'user', 'external_system', 'time' (scheduler), 'policy'
+- **description**: Role responsibilities
+
+### 2. Identify Domain Events
+Events are things that happen in the domain (past tense). For each event:
+- **name**: Event name in PastTense (e.g., 'RoomBooked', 'PaymentReceived')
+- **description**: What this event represents in business terms
+- **category**: One of 'domain_event', 'integration_event', 'system_event'
+- **aggregate**: The aggregate that emits this event
+- **triggered_by**: The command that causes this event
+- **payload**: Key data attributes carried by the event
+- **triggers_policies**: Policy names that react to this event
+
+### 3. Identify Commands
+Commands are intentions to change state (imperative form). For each command:
+- **name**: Command name (e.g., 'BookRoom', 'CancelBooking')
+- **description**: What this command intends to accomplish
+- **category**: One of 'user_command', 'system_command', 'policy_command'
+- **actor**: Who initiates this command
+- **target_aggregate**: Which aggregate handles it
+- **parameters**: Input parameters required
+- **preconditions**: What must be true before execution
+- **produces_events**: Events produced on success
+
+### 4. Identify Policies
+Policies react to events and may trigger new commands. For each policy:
+- **name**: Policy name (e.g., 'SendConfirmationOnBooking')
+- **description**: What this policy does
+- **triggered_by_event**: The event that activates it
+- **condition**: When the policy fires (if conditional)
+- **resulting_commands**: Commands triggered by this policy
+- **is_automated**: Whether it runs automatically
+
+### 5. Capture Event Flows
+Document key scenarios as flows:
+- **name**: Flow name (e.g., 'Happy Path Booking')
+- **description**: What this flow represents
+- **steps**: Ordered list of element names [Actor, Command, Aggregate, Event, Policy...]
+- **is_happy_path**: Whether this is the main success scenario
+
+### 6. Identify Hot Spots
+Flag areas of uncertainty:
+- **description**: What is unclear or contentious
+- **related_elements**: Names of elements involved
+- **questions**: Questions to resolve this
+
+### 7. Additional Analysis
+- **aggregates_mentioned**: List aggregate names identified
+- **temporal_boundaries**: Time-based boundaries (e.g., 'Check-in time')
+- **parallel_processes**: Processes that can happen concurrently
+
+Format output following the flow: Actor -> Command -> Aggregate -> Event(s) -> Policy -> Next Command
+

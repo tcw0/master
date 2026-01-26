@@ -1,18 +1,96 @@
-Design the technical architecture following DDD patterns:
+Task: Design Technical Architecture Following DDD Patterns
 
-1. Hexagonal Architecture:
-   - Domain Layer: [Entities, VOs, Domain Services, Repositories interfaces]
-   - Application Layer: [Application Services, DTOs, Commands/Queries]
-   - Infrastructure Layer: [Repository implementations, External service adapters]
-   - Presentation Layer: [APIs (REST/GRAPHQL)]
+Based on the bounded contexts and aggregate designs, create the technical architecture following hexagonal/ports-and-adapters patterns.
 
-2. For each Bounded Context:
-   - Design the anti-corruption layers needed
-   - Define the published events/APIs
+## Bounded Contexts (from Phase 3)
 
-3. Technical patterns to apply:
-   - Repository pattern for aggregate persistence
-   - Specification pattern for complex queries
-   - Domain Events for decoupling
+{bounded_contexts}
+
+## Aggregates (from Phase 4)
+
+{aggregates}
+
+## Instructions
+
+### 1. Design Architecture Per Bounded Context
+For each bounded context, design the hexagonal architecture layers:
+
+**Context Architecture:**
+- **context_name**: Name of the bounded context
+- **description**: Brief technical architecture description
+- **persistence_technology**: Database (e.g., 'PostgreSQL', 'MongoDB')
+- **messaging_technology**: Message broker if used (e.g., 'RabbitMQ')
+
+**Domain Layer** (pure business logic, no infrastructure):
+- **aggregates**: Aggregate names
+- **entities**: Entity classes
+- **value_objects**: Value object classes
+- **domain_services**: Services for cross-aggregate logic (name, type, description, dependencies)
+- **repository_interfaces**: Interface definitions (e.g., 'IBookingRepository')
+- **domain_events**: Event classes
+- **specifications**: Specification classes for queries
+
+**Application Layer** (use case orchestration):
+- **application_services**: Application services (name, type, description, dependencies)
+- **command_handlers**: CQRS command handlers
+- **query_handlers**: CQRS query handlers
+- **event_handlers**: Domain event handlers
+- **dtos**: Data transfer objects
+- **commands**: Command DTOs
+- **queries**: Query DTOs
+
+**Infrastructure Layer** (technical implementations):
+- **repository_implementations**: Repository implementations (name, type, description, dependencies)
+- **persistence_models**: ORM/database models
+- **external_service_adapters**: External service adapters
+- **messaging_adapters**: Message queue adapters
+- **configuration**: Setup classes
+
+**Presentation Layer** (API/UI):
+- **controllers**: REST controllers
+- **graphql_resolvers**: GraphQL resolvers (if applicable)
+- **request_models**: API request DTOs
+- **response_models**: API response DTOs
+- **middleware**: Middleware components
+
+### 2. Anti-Corruption Layers
+For each ACL needed:
+- **name**: ACL name (e.g., 'PaymentGatewayACL')
+- **source_context**: External/upstream context
+- **target_context**: Protected context
+- **translator_services**: Translation services
+- **facade_interface**: Simplified interface
+- **translated_concepts**: What gets translated
+- **rationale**: Why ACL is needed
+
+### 3. Published Interfaces
+For each API/event interface:
+- **context_name**: Publishing context
+- **interface_type**: 'rest', 'graphql', 'grpc', 'events', 'websocket'
+- **name**: Interface name
+- **endpoints**: API endpoints (e.g., 'POST /bookings')
+- **events_published**: Published events
+- **consumers**: Consuming contexts
+- **versioning_strategy**: How versioned
+
+### 4. Technical Patterns
+Document patterns applied:
+- **pattern**: 'repository', 'unit_of_work', 'specification', 'domain_events', 'cqrs', 'event_sourcing', 'saga', 'outbox', 'factory', 'domain_service'
+- **applied_in**: Where used
+- **rationale**: Why chosen
+- **implementation_notes**: Specific guidance
+
+### 5. Integration Strategy
+- **integration_approach**: Overall strategy (e.g., 'Event-driven with REST for queries')
+- **event_bus_technology**: Central event bus if used
+- **api_gateway**: API gateway approach
+
+### 6. Deployment
+- **deployment_units**: Service groupings (name, contexts_included, rationale, scaling_considerations)
+- **deployment_approach**: Strategy (e.g., 'Kubernetes microservices', 'Modular monolith')
+
+### 7. Concerns and Recommendations
+- **infrastructure_concerns**: Technical risks
+- **recommendations**: Architecture recommendations
 
 Show how each technical decision supports the domain model.

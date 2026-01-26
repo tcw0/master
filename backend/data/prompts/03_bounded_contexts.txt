@@ -1,18 +1,72 @@
-Now let's identify and map Bounded Contexts:
+Task: Identify and Map Bounded Contexts
 
-1. Group related terms from our glossary into potential bounded contexts
-2. For each bounded context, define:
-   - Core purpose and responsibility
-   - Key aggregates within it
-   - The ubiquitous language specific to this context
-3. Identify relationships between contexts:
-   - Upstream/Downstream relationships
-   - Shared Kernel
-   - Customer/Supplier
-   - Conformist
-   - Anti-corruption Layer needs
-   - Published Language
-4. Create a Context Map showing these relationships
-5. Flag any terms that have different meanings across contexts
+Based on the requirements, glossary, and event storming analysis, identify bounded contexts and create a context map.
+
+## Requirements Document
+
+{requirements}
+
+## Ubiquitous Language Glossary (from Phase 1)
+
+{glossary}
+
+## Event Storming Results (from Phase 2)
+
+{events}
+
+## Instructions
+
+### 1. Identify Bounded Contexts
+Group related domain concepts into bounded contexts. For each context:
+- **name**: Context name (e.g., 'Reservation', 'Billing', 'Identity')
+- **purpose**: Core purpose and single responsibility
+- **classification**: One of 'core' (competitive advantage), 'supporting' (necessary but not differentiating), 'generic' (could be off-the-shelf)
+- **key_aggregates**: Main aggregates in this context
+- **ubiquitous_language_terms**: Glossary terms specific to this context
+- **owned_events**: Domain events published by this context
+- **handled_commands**: Commands processed by this context
+- **team_ownership**: Suggested team or ownership area (optional)
+- **boundary_concerns**: Any concerns about size or clarity (optional)
+
+### 2. Define Context Relationships
+Map how contexts interact. For each relationship:
+- **upstream_context**: The supplier/provider context
+- **downstream_context**: The consumer context
+- **relationship_type**: One of:
+  - 'partnership': Two contexts cooperate as equals
+  - 'shared_kernel': Shared subset of domain model
+  - 'customer_supplier': Upstream/downstream with negotiation
+  - 'conformist': Downstream conforms to upstream
+  - 'anticorruption_layer': Downstream protects itself
+  - 'open_host_service': Upstream provides well-defined protocol
+  - 'published_language': Shared language for communication
+  - 'separate_ways': No integration
+- **description**: How these contexts interact
+- **integration_style**: 'synchronous_api', 'asynchronous_events', 'shared_database', 'file_transfer', 'none'
+- **acl_needed**: Whether Anti-Corruption Layer is recommended
+- **acl_rationale**: Why ACL is needed (if applicable)
+
+### 3. Identify External Systems
+List external systems that contexts integrate with:
+- **name**: System name (e.g., 'PaymentGateway', 'EmailService')
+- **description**: What it provides
+- **integration_contexts**: Which contexts integrate with it
+- **integration_style**: How they integrate
+- **acl_recommended**: Whether ACL is recommended
+
+### 4. Document Shared Terms
+Identify terms with different meanings across contexts:
+- **term**: The ambiguous term
+- **definitions_by_context**: Map of context -> meaning
+- **translation_strategy**: How to handle translation
+
+### 5. Strategic Classification
+- **core_domain**: Which context provides competitive advantage
+- **core_domain_rationale**: Why it's core
+- **supporting_domains** and **generic_domains**: Lists of other contexts
+
+### 6. Recommendations
+- **boundary_recommendations**: Suggestions for splitting or merging
+- **integration_concerns**: Concerns about context integrations
 
 Question any contexts that seem too large or have unclear boundaries.
