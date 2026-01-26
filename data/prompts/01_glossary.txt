@@ -1,0 +1,72 @@
+Task: Extract and Define Ubiquitous Language from Requirements
+
+When presented with a set of requirements, your first action as a DDD specialist is to meticulously extract and define all domain terms to establish a clear ubiquitous language. Follow this structured approach:
+Instructions for Building the Ubiquitous Language Glossary:
+
+Initial Analysis Phase
+
+Read through all requirements carefully
+Identify every noun, verb, and business concept mentioned
+Pay special attention to terms that appear multiple times or seem central to the domain
+Note any terms that might have different meanings in different contexts
+
+Create a Structured Glossary Table
+Format your output as follows:
+## Ubiquitous Language Glossary
+
+| Term | Definition | Business Context | Related Terms | Questions/Clarifications Needed |
+|------|------------|------------------|---------------|--------------------------------|
+| [Term] | [Clear business definition] | [When/where this term is used] | [Other related domain terms] | [Any ambiguities or questions] |
+####
+
+For Each Term, Ensure You:
+
+Provide a business-focused definition (not technical)
+Explain the term as a domain expert would
+Identify the business context where this term applies
+Link related terms to show relationships
+Flag any ambiguities or areas needing clarification
+
+Categories to Pay Special Attention To:
+
+Entities: Things with identity that persist over time
+Value Objects: Things defined by their attributes
+Actions/Commands: What users or systems do
+Events: Things that happen in the domain
+Rules/Policies: Business constraints and invariants
+Roles: Different actors in the system
+States: Different conditions things can be in
+
+After Creating the Initial Glossary:
+
+Identify terms that might belong to different bounded contexts
+Flag any terms that seem to have multiple meanings
+Highlight core domain terms vs supporting/generic terms
+List questions about unclear or ambiguous terms
+
+Follow-up Questions to Ask:
+
+"I noticed [term] is used in different ways. Can you clarify...?"
+"Is [term A] the same as [term B] or are they different concepts?"
+"When you say [term], does this include...?"
+"Are there any industry-standard definitions we should align with?"
+
+Example Output Structure:
+## Ubiquitous Language Glossary
+
+Based on the requirements provided, I've identified the following key domain terms:
+
+| Term | Definition | Business Context | Related Terms | Questions/Clarifications Needed |
+|------|------------|------------------|---------------|--------------------------------|
+| Order | A customer's request to purchase products | Used throughout the sales process | Customer, Product, Payment | Is there a difference between 'Order' and 'Purchase Order'? |
+| Customer | An individual or organization that can place orders | Central to all business operations | Order, Account, Payment Method | Are there different types of customers (B2B vs B2C)? |
+
+### Potential Bounded Context Indicators:
+- Terms related to [Context A]: ...
+- Terms related to [Context B]: ...
+
+### Areas Requiring Domain Expert Clarification:
+1. [Specific ambiguity or question]
+2. [Another clarification needed]
+
+Remember: This glossary is a living document that should evolve as understanding deepens. Challenge any technical jargon and insist on business-friendly definitions that a domain expert would recognize and approve.
