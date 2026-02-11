@@ -657,6 +657,7 @@ def _log_artifact_summary(phase: PhaseConfig, artifact: BaseModel) -> None:
 def save_artifact(
     domain: str,
     provider: str,
+    model: str,
     phase: PhaseConfig,
     artifact: BaseModel,
     raw_response: str | None = None,
@@ -664,15 +665,26 @@ def save_artifact(
     """
     Save artifact to disk with metadata.
     
+    Output directory structure:
+    - ollama:      output/{domain}/ollama/
+    - openrouter:  output/{domain}/openrouter/{model_family}/
+    
+    Filename format: {timestamp}_{phase_id}.{ext}
+    
     Saves:
-    - {phase_id}_{timestamp}.json: The artifact data
-    - {phase_id}_{timestamp}.schema.json: JSON schema for validation
-    - {phase_id}_{timestamp}.raw.txt: Raw LLM response (if available)
+    - {timestamp}_{phase_id}.json: The artifact data
+    - {timestamp}_{phase_id}.schema.json: JSON schema for validation
+    - {timestamp}_{phase_id}.raw.txt: Raw LLM response (if available)
     """
-    out_dir = OUTPUT_DIR / domain / provider
+    # Build output directory: add model family subfolder for openrouter
+    if provider == PROVIDER_OPENROUTER:
+        family = detect_model_family(model)
+        out_dir = OUTPUT_DIR / domain / provider / family
+    else:
+        out_dir = OUTPUT_DIR / domain / provider
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_name = f"{phase.id}_{ts}"
+    base_name = f"{ts}_{phase.id}"
     
     # Save artifact as JSON
     artifact_path = out_dir / f"{base_name}.json"
@@ -831,7 +843,7 @@ def run_workflow(
                 state.raw_responses[phase.output_key] = raw_or_error
             
             # Persist to disk
-            save_artifact(domain, provider, phase, artifact, raw_or_error)
+            save_artifact(domain, provider, model, phase, artifact, raw_or_error)
             successful += 1
         else:
             # Failure: create error artifact to allow pipeline to continue
@@ -839,7 +851,7 @@ def run_workflow(
             state.artifacts[phase.output_key] = error_artifact
             state.errors[phase.output_key] = raw_or_error or "Unknown error"
             
-            save_artifact(domain, provider, phase, error_artifact)
+            save_artifact(domain, provider, model, phase, error_artifact)
             logger.error(f"✗ {phase.name} failed: {raw_or_error}")
         
         print()  # Blank line between phases
