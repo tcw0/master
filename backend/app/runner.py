@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -27,8 +28,13 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough, RunnableSerializable
+from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, ValidationError
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import all structured output models
 from models.glossary import GlossaryArtifact
@@ -47,6 +53,70 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+
+PROVIDER_OLLAMA = "ollama"
+PROVIDER_OPENROUTER = "openrouter"
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_DEFAULT_HEADERS = {
+    "HTTP-Referer": "http://localhost",
+    "X-Title": "DDD Pipeline Runner",
+}
+
+
+def detect_model_family(model: str) -> str:
+    """
+    Detect model family from OpenRouter model slug.
+
+    Examples:
+        'openai/gpt-4o' → 'openai'
+        'anthropic/claude-sonnet-4-20250514' → 'anthropic'
+        'google/gemini-1.5-pro' → 'google'
+    """
+    model_lower = model.lower()
+    if "/" in model_lower:
+        prefix = model_lower.split("/")[0]
+        if prefix in ("openai", "anthropic", "google", "meta-llama", "mistralai", "deepseek"):
+            return prefix
+    # Fallback heuristics for bare model names
+    if "gpt" in model_lower or "o1" in model_lower or "o3" in model_lower:
+        return "openai"
+    if "claude" in model_lower:
+        return "anthropic"
+    if "gemini" in model_lower:
+        return "google"
+    return "unknown"
+
+
+def get_structured_output_method(provider: str, model: str) -> str:
+    """
+    Select the optimal structured output enforcement method.
+
+    Strategy:
+    - json_schema: Strict server-side JSON schema enforcement.
+      Best for OpenAI models (native support) and Ollama.
+    - function_calling: Uses tool/function calling to enforce structure.
+      Most reliable for Claude, Gemini, and other models via OpenRouter,
+      as OpenRouter translates tool calls to each provider's native format.
+
+    Returns:
+        'json_schema' or 'function_calling'
+    """
+    if provider == PROVIDER_OLLAMA:
+        return "json_schema"
+
+    # OpenRouter: method depends on underlying model
+    family = detect_model_family(model)
+    if family == "openai":
+        # OpenAI models support native JSON schema response format
+        return "json_schema"
+    # Claude, Gemini, and others: function calling via OpenRouter
+    return "json_schema"
 
 
 # =============================================================================
@@ -241,20 +311,53 @@ def get_prompt_hash(prompt_path: Path) -> str:
 # =============================================================================
 
 def init_llm(
+    provider: str,
+    model: str,
+    temperature: float = 0.3,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> BaseChatModel:
+    """
+    Initialize LLM based on provider selection.
+
+    Supports:
+    - ollama: Local Ollama instance (requires running Ollama server)
+    - openrouter: Cloud models via OpenRouter (OpenAI, Claude, Gemini, etc.)
+
+    Args:
+        provider: 'ollama' or 'openrouter'
+        model: Model name (e.g., 'llama3.2' for Ollama, 'openai/gpt-4o' for OpenRouter)
+        temperature: Generation temperature (lower = more deterministic)
+        api_key: API key (OpenRouter only; falls back to OPENROUTER_API_KEY env var)
+        base_url: Server URL (Ollama only; defaults to http://localhost:11434)
+
+    Returns:
+        Configured BaseChatModel instance
+    """
+    if provider == PROVIDER_OLLAMA:
+        return _init_ollama(model, base_url or "http://localhost:11434", temperature)
+    elif provider == PROVIDER_OPENROUTER:
+        return _init_openrouter(model, temperature, api_key)
+    else:
+        logger.error(f"Unknown provider: '{provider}'. Use 'ollama' or 'openrouter'.")
+        sys.exit(1)
+
+
+def _init_ollama(
     model: str,
     base_url: str,
-    temperature: float = 0.3,
+    temperature: float,
     num_predict: int = 8192,
 ) -> ChatOllama:
     """
-    Initialize Ollama LLM with connection validation.
-    
+    Initialize local Ollama LLM with connection validation.
+
     Args:
-        model: Ollama model name
+        model: Ollama model name (e.g., 'llama3.2')
         base_url: Ollama server URL
-        temperature: Generation temperature (lower = more deterministic)
+        temperature: Generation temperature
         num_predict: Maximum tokens for response
-    
+
     Returns:
         Configured ChatOllama instance
     """
@@ -272,6 +375,61 @@ def init_llm(
         return llm
     except Exception as e:
         logger.error(f"Failed to connect to Ollama: {e}")
+        sys.exit(1)
+
+
+def _init_openrouter(
+    model: str,
+    temperature: float,
+    api_key: str | None = None,
+    max_tokens: int = 16384,
+) -> ChatOpenAI:
+    """
+    Initialize OpenRouter LLM via OpenAI-compatible API.
+
+    OpenRouter provides a unified API for OpenAI, Claude, Gemini, and many other
+    models. Since it's OpenAI-API compatible, we use LangChain's ChatOpenAI with
+    a custom base_url.
+
+    Structured output enforcement strategy:
+    - OpenAI models: json_schema (native server-side enforcement)
+    - Claude/Gemini/others: function_calling (translated by OpenRouter)
+
+    Args:
+        model: OpenRouter model slug (e.g., 'openai/gpt-4o', 'anthropic/claude-sonnet-4-20250514')
+        temperature: Generation temperature
+        api_key: OpenRouter API key (falls back to OPENROUTER_API_KEY env var)
+        max_tokens: Maximum tokens for response
+
+    Returns:
+        Configured ChatOpenAI instance pointing to OpenRouter
+    """
+    resolved_key = api_key or os.getenv("OPENROUTER_API_KEY")
+    if not resolved_key:
+        logger.error(
+            "OpenRouter API key not found. "
+            "Set OPENROUTER_API_KEY in your .env file or pass --api-key."
+        )
+        sys.exit(1)
+
+    try:
+        llm = ChatOpenAI(
+            model=model,
+            api_key=resolved_key,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            default_headers=OPENROUTER_DEFAULT_HEADERS,
+        )
+        family = detect_model_family(model)
+        method = get_structured_output_method(PROVIDER_OPENROUTER, model)
+        logger.info(
+            f"Initialized OpenRouter: {model} "
+            f"(family={family}, structured_output={method})"
+        )
+        return llm
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenRouter: {e}")
         sys.exit(1)
 
 
@@ -329,6 +487,7 @@ def build_structured_chain(
     phase: PhaseConfig,
     state: WorkflowState,
     include_raw: bool = True,
+    structured_output_method: str = "json_schema",
 ) -> RunnableSerializable:
     """
     Build an LCEL chain with structured output enforcement.
@@ -337,13 +496,18 @@ def build_structured_chain(
     1. RunnablePassthrough (accepts empty input)
     2. Context builder (assembles prompt variables)
     3. Prompt template (formats the message)
-    4. Structured LLM (enforces JSON schema output)
+    4. Structured LLM (enforces schema output via selected method)
+    
+    Structured output methods:
+    - json_schema: Server-side JSON schema enforcement (OpenAI, Ollama)
+    - function_calling: Tool/function calling (Claude, Gemini via OpenRouter)
     
     Args:
         llm: Base language model
         phase: Phase configuration
         state: Workflow state for context
         include_raw: Whether to capture raw response for debugging
+        structured_output_method: Method for structured output enforcement
     
     Returns:
         Runnable chain that produces structured output
@@ -351,12 +515,12 @@ def build_structured_chain(
     prompt = build_prompt(phase)
     context_builder = build_context_builder(phase, state)
     
-    # Configure structured output with JSON schema enforcement
-    # method="json_schema" provides strict schema validation
-    # include_raw=True captures the raw response for debugging
+    # Configure structured output with the provider-appropriate method
+    # json_schema: strict server-side enforcement (OpenAI, Ollama)
+    # function_calling: tool-based enforcement (Claude, Gemini via OpenRouter)
     structured_llm = llm.with_structured_output(
         phase.output_schema,
-        method="json_schema",
+        method=structured_output_method,
         include_raw=include_raw,
     )
     
@@ -380,6 +544,7 @@ def run_phase_with_retry(
     phase: PhaseConfig,
     state: WorkflowState,
     max_retries: int = 2,
+    structured_output_method: str = "json_schema",
 ) -> tuple[BaseModel | None, str | None]:
     """
     Execute a phase with retry logic for transient failures.
@@ -389,13 +554,18 @@ def run_phase_with_retry(
         phase: Phase configuration
         state: Workflow state
         max_retries: Maximum retry attempts
+        structured_output_method: Method for structured output enforcement
     
     Returns:
         Tuple of (artifact, raw_response) or (None, error_message) on failure
     """
     logger.info(f"--- Phase {phase.phase_number}: {phase.name} ---")
     
-    chain = build_structured_chain(llm, phase, state, include_raw=True)
+    chain = build_structured_chain(
+        llm, phase, state,
+        include_raw=True,
+        structured_output_method=structured_output_method,
+    )
     
     last_error = None
     raw_response = None
@@ -409,7 +579,25 @@ def run_phase_with_retry(
             if isinstance(result, dict):
                 artifact = result.get("parsed")
                 raw_msg = result.get("raw")
-                raw_response = raw_msg.content if raw_msg else None
+                if raw_msg:
+                    # Extract raw response for debugging.
+                    # json_schema method: response content is the JSON string.
+                    # function_calling method: content may be empty; structured
+                    #   data arrives via tool_calls instead.
+                    content = getattr(raw_msg, "content", None)
+                    if isinstance(content, str) and content:
+                        raw_response = content
+                    elif isinstance(content, list) and content:
+                        # Some providers return content as a list of blocks
+                        raw_response = json.dumps(content, indent=2, default=str)
+                    elif hasattr(raw_msg, "tool_calls") and raw_msg.tool_calls:
+                        raw_response = json.dumps(
+                            raw_msg.tool_calls, indent=2, default=str
+                        )
+                    else:
+                        raw_response = str(raw_msg)
+                else:
+                    raw_response = None
             else:
                 artifact = result
                 raw_response = None
@@ -565,20 +753,24 @@ def create_error_artifact(phase: PhaseConfig, error: str) -> BaseModel:
 
 def run_workflow(
     requirements_path: Path,
+    provider: str,
     model: str,
-    base_url: str,
     temperature: float,
     max_retries: int = 2,
+    api_key: str | None = None,
+    base_url: str | None = None,
 ) -> WorkflowState:
     """
     Execute the complete DDD workflow pipeline.
     
     Args:
         requirements_path: Path to requirements document
-        model: Ollama model name
-        base_url: Ollama server URL
+        provider: LLM provider ('ollama' or 'openrouter')
+        model: Model name (e.g., 'llama3.2' or 'openai/gpt-4o')
         temperature: LLM temperature
         max_retries: Max retries per phase
+        api_key: API key for cloud providers (OpenRouter)
+        base_url: Server URL override (Ollama only)
     
     Returns:
         WorkflowState with all artifacts
@@ -586,10 +778,18 @@ def run_workflow(
     ensure_prompts_present()
     
     domain = derive_domain_name(requirements_path)
-    provider = "ollama"
+    
+    # Determine structured output method based on provider + model
+    structured_output_method = get_structured_output_method(provider, model)
     
     # Initialize LLM
-    llm = init_llm(model=model, base_url=base_url, temperature=temperature)
+    llm = init_llm(
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        api_key=api_key,
+        base_url=base_url,
+    )
     
     # Initialize workflow state
     state = WorkflowState(
@@ -606,8 +806,10 @@ def run_workflow(
     print("=" * 60)
     print(f"  Run ID       : {state.run_id}")
     print(f"  Domain       : {domain}")
+    print(f"  Provider     : {provider}")
     print(f"  Model        : {model}")
     print(f"  Temperature  : {temperature}")
+    print(f"  Struct. Out  : {structured_output_method}")
     print(f"  Requirements : {requirements_path.name}")
     print(f"  Req. Hash    : {state.get_requirements_hash()}")
     print("=" * 60)
@@ -617,7 +819,9 @@ def run_workflow(
     successful = 0
     for phase in PHASES:
         artifact, raw_or_error = run_phase_with_retry(
-            llm, phase, state, max_retries=max_retries
+            llm, phase, state,
+            max_retries=max_retries,
+            structured_output_method=structured_output_method,
         )
         
         if artifact is not None:
@@ -667,16 +871,34 @@ def main():
         help="Path to requirements text file",
     )
     parser.add_argument(
+        "--provider",
+        type=str,
+        default="ollama",
+        choices=["ollama", "openrouter"],
+        help="LLM provider: 'ollama' for local models, 'openrouter' for cloud models",
+    )
+    parser.add_argument(
         "--model",
         type=str,
         default="llama3.2",
-        help="Ollama model name",
+        help=(
+            "Model name. "
+            "Ollama: 'llama3.2', 'mistral', etc. "
+            "OpenRouter: 'openai/gpt-4o', 'anthropic/claude-sonnet-4-20250514', "
+            "'google/gemini-2.5-flash', etc."
+        ),
+    )
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="API key for OpenRouter (overrides OPENROUTER_API_KEY env var)",
     )
     parser.add_argument(
         "--base-url",
         type=str,
-        default="http://localhost:11434",
-        help="Ollama server URL",
+        default=None,
+        help="Ollama server URL (default: http://localhost:11434)",
     )
     parser.add_argument(
         "--temperature",
@@ -695,10 +917,12 @@ def main():
     
     run_workflow(
         requirements_path=Path(args.requirements),
+        provider=args.provider,
         model=args.model,
-        base_url=args.base_url,
         temperature=args.temperature,
         max_retries=args.max_retries,
+        api_key=args.api_key,
+        base_url=args.base_url,
     )
 
 

@@ -151,7 +151,7 @@ class EventFlow(BaseModel):
     )
     steps: list[str] = Field(
         ...,
-        description="Ordered list of element names: Actor, Command, Aggregate, Event, Policy..."
+        description="Ordered list where EACH ELEMENT is a SEPARATE string. Example: ['Guest', 'BookRoom', 'Booking', 'RoomBooked', 'SendConfirmation']. Do NOT concatenate with arrows like 'A -> B -> C'."
     )
     is_happy_path: bool = Field(
         default=True,

@@ -52,7 +52,9 @@ Policies react to events and may trigger new commands. For each policy:
 Document key scenarios as flows:
 - **name**: Flow name (e.g., 'Happy Path Booking')
 - **description**: What this flow represents
-- **steps**: Ordered list of element names [Actor, Command, Aggregate, Event, Policy...]
+- **steps**: An array where EACH step is a SEPARATE string element. 
+  CORRECT: ["Guest", "BookRoom", "Booking", "RoomBooked", "SendConfirmationPolicy", "SendEmail"]
+  WRONG: ["Guest -> BookRoom -> Booking"] (do NOT use arrows or concatenate)
 - **is_happy_path**: Whether this is the main success scenario
 
 ### 6. Identify Hot Spots
@@ -66,5 +68,7 @@ Flag areas of uncertainty:
 - **temporal_boundaries**: Time-based boundaries (e.g., 'Check-in time')
 - **parallel_processes**: Processes that can happen concurrently
 
-Format output following the flow: Actor -> Command -> Aggregate -> Event(s) -> Policy -> Next Command
+Conceptual flow pattern: Actor -> Command -> Aggregate -> Event(s) -> Policy -> Next Command
+
+IMPORTANT: In the steps array, each element must be a separate string. Never concatenate with arrows.
 

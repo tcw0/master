@@ -10,14 +10,14 @@ Each phase produces a structured artifact:
 """
 
 # Phase 1: Glossary (Ubiquitous Language)
-from backend.app.models.glossary import (
+from .glossary import (
     GlossaryTerm,
     BoundedContextIndicator,
     GlossaryArtifact,
 )
 
 # Phase 2: Event Storming
-from backend.app.models.event_storming import (
+from .event_storming import (
     Actor,
     DomainEvent,
     Command,
@@ -28,7 +28,7 @@ from backend.app.models.event_storming import (
 )
 
 # Phase 3: Bounded Contexts
-from backend.app.models.bounded_contexts import (
+from .bounded_contexts import (
     BoundedContext,
     ContextRelationship,
     SharedTerm,
@@ -37,7 +37,7 @@ from backend.app.models.bounded_contexts import (
 )
 
 # Phase 4: Aggregates
-from backend.app.models.aggregates import (
+from .aggregates import (
     Attribute,
     ValueObject,
     EnumDefinition,
@@ -50,7 +50,7 @@ from backend.app.models.aggregates import (
 )
 
 # Phase 5: Architecture
-from backend.app.models.architecture import (
+from .architecture import (
     Component,
     DomainLayer,
     ApplicationLayer,
