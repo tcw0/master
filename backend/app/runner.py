@@ -43,6 +43,9 @@ from models.bounded_contexts import BoundedContextsArtifact
 from models.aggregates import AggregatesArtifact
 from models.architecture import ArchitectureArtifact
 
+# Validation engine
+from validation import ValidationEngine, ValidationReport, ValidationSeverity
+
 # Type variable for generic artifact handling
 ArtifactT = TypeVar("ArtifactT", bound=BaseModel)
 
@@ -238,6 +241,7 @@ class WorkflowState:
     artifacts: dict[str, BaseModel] = field(default_factory=dict)
     raw_responses: dict[str, str] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
+    validation_reports: dict[str, ValidationReport] = field(default_factory=dict)
     
     def get_artifact_as_json(self, key: str) -> str:
         """
@@ -545,9 +549,15 @@ def run_phase_with_retry(
     state: WorkflowState,
     max_retries: int = 2,
     structured_output_method: str = "json_schema",
-) -> tuple[BaseModel | None, str | None]:
+    validation_engine: ValidationEngine | None = None,
+) -> tuple[BaseModel | None, str | None, ValidationReport | None]:
     """
     Execute a phase with retry logic for transient failures.
+    
+    Two-stage validation per attempt:
+    1. Structural: LLM output must parse into the expected Pydantic schema.
+    2. Semantic: deterministic DDD validation rules (if engine is provided).
+       FAILURE-severity violations consume a retry attempt.
     
     Args:
         llm: Language model instance
@@ -555,9 +565,11 @@ def run_phase_with_retry(
         state: Workflow state
         max_retries: Maximum retry attempts
         structured_output_method: Method for structured output enforcement
+        validation_engine: Optional engine for semantic validation
     
     Returns:
-        Tuple of (artifact, raw_response) or (None, error_message) on failure
+        Tuple of (artifact, raw_response, validation_report).
+        On failure: (None, error_message, None).
     """
     logger.info(f"--- Phase {phase.phase_number}: {phase.name} ---")
     
@@ -614,7 +626,25 @@ def run_phase_with_retry(
             
             # Log success with artifact summary
             _log_artifact_summary(phase, artifact)
-            return artifact, raw_response
+            
+            # --- Stage 2: Semantic validation ---
+            if validation_engine is not None:
+                # Build temporary artifact dict including this new artifact
+                temp_artifacts = {**state.artifacts, phase.output_key: artifact}
+                report = validation_engine.validate_phase(phase.id, temp_artifacts)
+                
+                _log_validation_summary(phase, report)
+                
+                if report.has_failures() and attempt < max_retries:
+                    logger.warning(
+                        f"Attempt {attempt + 1}: {report.failure_count} validation "
+                        f"failure(s). Retrying..."
+                    )
+                    continue  # consume a retry attempt
+                
+                return artifact, raw_response, report
+            
+            return artifact, raw_response, None
             
         except (ValidationError, TypeError, ValueError) as e:
             last_error = str(e)
@@ -623,7 +653,22 @@ def run_phase_with_retry(
             else:
                 logger.error(f"Phase {phase.id} failed after {max_retries + 1} attempts: {last_error}")
     
-    return None, last_error
+    return None, last_error, None
+
+
+def _log_validation_summary(phase: PhaseConfig, report: ValidationReport) -> None:
+    """Log a compact summary of validation results."""
+    parts = []
+    if report.failure_count:
+        parts.append(f"{report.failure_count} failure(s)")
+    if report.warning_count:
+        parts.append(f"{report.warning_count} warning(s)")
+    if report.pass_count:
+        parts.append(f"{report.pass_count} passed")
+    summary = ", ".join(parts) if parts else "no rules executed"
+    
+    icon = "✗" if report.has_failures() else ("⚠" if report.has_warnings() else "✓")
+    logger.info(f"  {icon} Validation [{phase.name}]: {summary}")
 
 
 def _log_artifact_summary(phase: PhaseConfig, artifact: BaseModel) -> None:
@@ -705,6 +750,34 @@ def save_artifact(
         logger.info(f"  → Raw: {raw_path.name}")
     
     return artifact_path
+
+
+def save_validation_report(
+    domain: str,
+    provider: str,
+    model: str,
+    phase: PhaseConfig,
+    report: ValidationReport,
+) -> Path:
+    """
+    Save a validation report to disk alongside its artifact.
+    
+    Filename format: {timestamp}_{phase_id}.validation.json
+    """
+    if provider == PROVIDER_OPENROUTER:
+        family = detect_model_family(model)
+        out_dir = OUTPUT_DIR / domain / provider / family
+    else:
+        out_dir = OUTPUT_DIR / domain / provider
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_name = f"{ts}_{phase.id}"
+    
+    report_path = out_dir / f"{base_name}.validation.json"
+    report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    logger.info(f"  → Validation: {report_path.name}")
+    
+    return report_path
 
 
 def create_error_artifact(phase: PhaseConfig, error: str) -> BaseModel:
@@ -789,6 +862,9 @@ def run_workflow(
     """
     ensure_prompts_present()
     
+    # Initialize validation engine (auto-discovers all registered rules)
+    validation_engine = ValidationEngine()
+    
     domain = derive_domain_name(requirements_path)
     
     # Determine structured output method based on provider + model
@@ -830,10 +906,11 @@ def run_workflow(
     # Execute phases sequentially
     successful = 0
     for phase in PHASES:
-        artifact, raw_or_error = run_phase_with_retry(
+        artifact, raw_or_error, report = run_phase_with_retry(
             llm, phase, state,
             max_retries=max_retries,
             structured_output_method=structured_output_method,
+            validation_engine=validation_engine,
         )
         
         if artifact is not None:
@@ -842,8 +919,14 @@ def run_workflow(
             if raw_or_error:
                 state.raw_responses[phase.output_key] = raw_or_error
             
+            # Store validation report
+            if report is not None:
+                state.validation_reports[phase.id] = report
+            
             # Persist to disk
             save_artifact(domain, provider, model, phase, artifact, raw_or_error)
+            if report is not None:
+                save_validation_report(domain, provider, model, phase, report)
             successful += 1
         else:
             # Failure: create error artifact to allow pipeline to continue
@@ -857,8 +940,16 @@ def run_workflow(
         print()  # Blank line between phases
     
     # Summary
+    total_failures = sum(
+        r.failure_count for r in state.validation_reports.values()
+    )
+    total_warnings = sum(
+        r.warning_count for r in state.validation_reports.values()
+    )
     print("=" * 60)
     print(f"Pipeline Complete: {successful}/{len(PHASES)} phases successful")
+    if total_failures or total_warnings:
+        print(f"Validation: {total_failures} failure(s), {total_warnings} warning(s)")
     if state.errors:
         print(f"Errors: {list(state.errors.keys())}")
     print("=" * 60)
