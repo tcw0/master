@@ -62,6 +62,7 @@ Thumbs.db
 */output/
 *context.txt
 
+
 # Test artifacts
 .pytest_cache/
 .coverage
@@ -77,3 +78,7 @@ dmypy.json
 # Logs
 *.log
 logs/
+
+# Testing
+temp/
+test.py
