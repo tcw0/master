@@ -266,7 +266,7 @@ class PipelineService:
             ctx: dict[str, str] = {}
             for inp in phase.inputs:
                 if inp == "requirements":
-                    ctx["requirements"] = _read_file(state.requirements_path)
+                    ctx["requirements"] = state.get_requirements_content()
                 else:
                     ctx[inp] = state.get_artifact_as_json(inp)
             return ctx

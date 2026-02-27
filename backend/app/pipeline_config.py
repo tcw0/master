@@ -162,17 +162,27 @@ class WorkflowState:
     Maintains state across workflow execution.
 
     Stores artifacts, metadata, and provides serialization for downstream phases.
+    Supports both file-path and text-based requirements for CLI and API usage.
     """
 
     domain: str
     provider: str
     model: str
-    requirements_path: Path
+    requirements_path: Path | None = None
+    requirements_text: str | None = None
     run_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     artifacts: dict[str, BaseModel] = field(default_factory=dict)
     raw_responses: dict[str, str] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
     validation_reports: dict[str, ValidationReport] = field(default_factory=dict)
+
+    def get_requirements_content(self) -> str:
+        """Get requirements text, from either text field or file path."""
+        if self.requirements_text:
+            return self.requirements_text
+        if self.requirements_path:
+            return self.requirements_path.read_text(encoding="utf-8")
+        raise ValueError("No requirements provided (need requirements_text or requirements_path)")
 
     def get_artifact_as_json(self, key: str) -> str:
         """
@@ -187,6 +197,7 @@ class WorkflowState:
         return artifact.model_dump_json(indent=2)
 
     def get_requirements_hash(self) -> str:
-        """Generate a hash of the requirements file for traceability."""
-        content = self.requirements_path.read_text(encoding="utf-8")
+        """Generate a hash of the requirements for traceability."""
+        content = self.get_requirements_content()
         return hashlib.sha256(content.encode()).hexdigest()[:16]
+
