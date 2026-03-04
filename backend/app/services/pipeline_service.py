@@ -70,7 +70,7 @@ class PipelineService:
     def __init__(
         self,
         llm_service: LLMService,
-        artifact_service: ArtifactService,
+        artifact_service: ArtifactService | None = None,
         validation_engine: ValidationEngine | None = None,
     ) -> None:
         self.llm_service = llm_service
@@ -129,29 +129,30 @@ class PipelineService:
                 if report is not None:
                     state.validation_reports[phase.id] = report
 
-                # Persist to disk
-                self.artifact_service.save_artifact(
-                    domain, self.llm_service.provider,
-                    self.llm_service.model, phase, artifact, raw_or_error,
-                )
-                if report is not None:
-                    self.artifact_service.save_validation_report(
+                # Persist to disk (when ArtifactService is available)
+                if self.artifact_service:
+                    self.artifact_service.save_artifact(
                         domain, self.llm_service.provider,
-                        self.llm_service.model, phase, report,
+                        self.llm_service.model, phase, artifact, raw_or_error,
                     )
+                    if report is not None:
+                        self.artifact_service.save_validation_report(
+                            domain, self.llm_service.provider,
+                            self.llm_service.model, phase, report,
+                        )
                 successful += 1
             else:
                 # Failure: create error artifact to allow pipeline to continue
-                error_artifact = self.artifact_service.create_error_artifact(
-                    phase, raw_or_error or "Unknown error",
-                )
-                state.artifacts[phase.output_key] = error_artifact
                 state.errors[phase.output_key] = raw_or_error or "Unknown error"
-
-                self.artifact_service.save_artifact(
-                    domain, self.llm_service.provider,
-                    self.llm_service.model, phase, error_artifact,
-                )
+                if self.artifact_service:
+                    error_artifact = self.artifact_service.create_error_artifact(
+                        phase, raw_or_error or "Unknown error",
+                    )
+                    state.artifacts[phase.output_key] = error_artifact
+                    self.artifact_service.save_artifact(
+                        domain, self.llm_service.provider,
+                        self.llm_service.model, phase, error_artifact,
+                    )
                 logger.error(f"✗ {phase.name} failed: {raw_or_error}")
 
             print()  # Blank line between phases

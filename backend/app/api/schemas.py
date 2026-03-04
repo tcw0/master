@@ -2,29 +2,11 @@
 API request/response schemas for the DDD pipeline.
 
 Pydantic models for HTTP request bodies and response payloads.
-These are separate from the domain models in models/ — they define
-the shape of the API contract, not the DDD artifacts themselves.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
-
 from pydantic import BaseModel, Field
-
-
-# =============================================================================
-# Enums
-# =============================================================================
-
-
-class PhaseStatus(str, Enum):
-    """Status of a pipeline phase within a session."""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
 
 
 # =============================================================================
@@ -55,10 +37,6 @@ class CreateSessionRequest(BaseModel):
         ge=0.0,
         le=1.0,
     )
-    api_key: str | None = Field(
-        default=None,
-        description="API key for OpenRouter (overrides env var)",
-    )
 
 
 class PhaseResponse(BaseModel):
@@ -66,9 +44,11 @@ class PhaseResponse(BaseModel):
     phase_id: str
     phase_name: str
     phase_number: int
-    status: PhaseStatus
+    status: str
     has_artifact: bool
     has_validation: bool
+    version: int | None = None
+    source: str | None = None
 
 
 class SessionResponse(BaseModel):
@@ -108,7 +88,9 @@ class RunPhaseResponse(BaseModel):
     """Response after executing a pipeline phase."""
     phase_id: str
     phase_name: str
-    status: PhaseStatus
+    status: str
+    version: int
+    source: str
     artifact: dict | None = None
     validation: dict | None = None
     error: str | None = None
@@ -123,7 +105,24 @@ class ArtifactResponse(BaseModel):
     """Response for retrieving a phase artifact."""
     phase_id: str
     phase_name: str
+    version: int
+    source: str
     artifact: dict
+
+
+class ArtifactVersionSummary(BaseModel):
+    """Summary of a single artifact version."""
+    version: int
+    source: str
+    status: str
+    created_at: str
+
+
+class ArtifactHistoryResponse(BaseModel):
+    """Response for artifact version history."""
+    phase_id: str
+    phase_name: str
+    versions: list[ArtifactVersionSummary]
 
 
 class UpdateArtifactRequest(BaseModel):
@@ -137,6 +136,8 @@ class UpdateArtifactResponse(BaseModel):
     """Response after updating a phase artifact."""
     phase_id: str
     phase_name: str
+    version: int
+    source: str
     artifact: dict
     validation: dict | None = None
 

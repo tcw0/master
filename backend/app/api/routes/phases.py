@@ -2,22 +2,23 @@
 Phase execution, artifact management, and validation endpoints.
 
 Core HITL workflow:
-1. POST  .../phases/{phase_id}/run       → Execute a phase
+1. POST  .../phases/{phase_id}/run       → Execute a phase (creates LLM version)
 2. GET   .../phases/{phase_id}/artifact  → Review the artifact
-3. PUT   .../phases/{phase_id}/artifact  → Edit the artifact
-4. POST  .../phases/{phase_id}/validate  → Re-validate after editing
-5. GET   .../phases/{phase_id}/validation → Get latest validation report
+3. PUT   .../phases/{phase_id}/artifact  → Edit the artifact (creates human version)
+4. GET   .../phases/{phase_id}/history   → View all versions
+5. POST  .../phases/{phase_id}/validate  → Re-validate after editing
+6. GET   .../phases/{phase_id}/validation → Get latest validation report
 """
 
 import json
 import logging
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.schemas import (
+    ArtifactHistoryResponse,
     ArtifactResponse,
-    PhaseStatus,
+    ArtifactVersionSummary,
     RunPhaseRequest,
     RunPhaseResponse,
     UpdateArtifactRequest,
@@ -25,15 +26,14 @@ from api.schemas import (
     ValidationResponse,
 )
 from api.dependencies import (
-    PipelineSession,
     build_workflow_state,
     check_phase_prerequisites,
     get_phase_config,
+    get_repository,
     run_validation_on_artifact,
-    session_store,
 )
+from db.repository import SessionRepository
 from services.llm_service import LLMService
-from services.artifact_service import ArtifactService
 from services.pipeline_service import PipelineService
 from validation import ValidationEngine
 
@@ -43,59 +43,36 @@ router = APIRouter(prefix="/sessions/{session_id}/phases", tags=["phases"])
 
 
 # =============================================================================
-# Helpers
-# =============================================================================
-
-
-def _get_session_or_404(session_id: str) -> PipelineSession:
-    """Retrieve a session or raise 404."""
-    session = session_store.get(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-    return session
-
-
-def _get_phase_or_404(phase_id: str):
-    """Retrieve a PhaseConfig or raise 404."""
-    phase = get_phase_config(phase_id)
-    if phase is None:
-        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
-    return phase
-
-
-# =============================================================================
 # Phase Execution
 # =============================================================================
 
 
 @router.post("/{phase_id}/run", response_model=RunPhaseResponse)
-async def run_phase(
+def run_phase(
     session_id: str,
     phase_id: str,
     request: RunPhaseRequest = RunPhaseRequest(),
+    repo: SessionRepository = Depends(get_repository),
 ) -> RunPhaseResponse:
     """
     Execute a single pipeline phase.
 
-    Prerequisites: all input phases must be completed (have artifacts).
-    Phase 1 (Glossary) has no prerequisites other than requirements.
-
-    The phase runs synchronously — the response contains the generated
-    artifact and validation report.
+    Creates a new artifact version with source='llm'.
+    Prerequisites: all input phases must have a completed artifact.
     """
-    session = _get_session_or_404(session_id)
-    phase = _get_phase_or_404(phase_id)
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-    # Check prerequisites
-    prereq_error = check_phase_prerequisites(session, phase)
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
+
+    # Check prerequisites using latest artifacts
+    latest_artifacts = repo.get_latest_artifacts(session_id)
+    prereq_error = check_phase_prerequisites(latest_artifacts, phase)
     if prereq_error:
         raise HTTPException(status_code=409, detail=prereq_error)
-
-    # Mark phase as running
-    phase_state = session.phases[phase.id]
-    phase_state.status = PhaseStatus.RUNNING
-    phase_state.error = None
-    session.touch()
 
     try:
         # Build services
@@ -103,21 +80,16 @@ async def run_phase(
             provider=session.provider,
             model=session.model,
             temperature=session.temperature,
-            api_key=session.api_key,
         )
-        artifact_service = ArtifactService()
-        validation_engine = ValidationEngine()
-
         pipeline = PipelineService(
             llm_service=llm_service,
-            artifact_service=artifact_service,
-            validation_engine=validation_engine,
+            validation_engine=ValidationEngine(),
         )
 
-        # Build workflow state from session
-        state = build_workflow_state(session, phase)
+        # Build workflow state from latest artifacts
+        state = build_workflow_state(session, latest_artifacts, phase)
 
-        # Execute the phase
+        # Execute
         artifact, raw_or_error, report = pipeline.run_phase(
             phase, state, max_retries=request.max_retries,
         )
@@ -126,103 +98,111 @@ async def run_phase(
             artifact_dict = json.loads(artifact.model_dump_json())
             report_dict = json.loads(report.model_dump_json()) if report else None
 
-            # Update session state
-            phase_state.status = PhaseStatus.COMPLETED
-            phase_state.artifact = artifact_dict
-            phase_state.raw_response = raw_or_error
-            phase_state.validation_report = report_dict
-            phase_state.error = None
-            phase_state.completed_at = datetime.now(timezone.utc).isoformat()
-            session.touch()
-
-            # Persist to disk
-            domain = session.requirements_name.lower().replace(" ", "_")
-            artifact_service.save_artifact(
-                domain, session.provider, session.model,
-                phase, artifact, raw_or_error,
+            db_artifact = repo.create_artifact_version(
+                session_id=session.id,
+                phase_id=phase.id,
+                source="llm",
+                status="completed",
+                content=artifact_dict,
+                validation_report=report_dict,
             )
-            if report:
-                artifact_service.save_validation_report(
-                    domain, session.provider, session.model,
-                    phase, report,
-                )
 
             return RunPhaseResponse(
                 phase_id=phase.id,
                 phase_name=phase.name,
-                status=PhaseStatus.COMPLETED,
+                status="completed",
+                version=db_artifact.version,
+                source="llm",
                 artifact=artifact_dict,
                 validation=report_dict,
             )
         else:
-            # Phase failed
-            phase_state.status = PhaseStatus.FAILED
-            phase_state.error = raw_or_error
-            session.touch()
+            db_artifact = repo.create_artifact_version(
+                session_id=session.id,
+                phase_id=phase.id,
+                source="llm",
+                status="failed",
+                error=raw_or_error,
+            )
 
             return RunPhaseResponse(
                 phase_id=phase.id,
                 phase_name=phase.name,
-                status=PhaseStatus.FAILED,
+                status="failed",
+                version=db_artifact.version,
+                source="llm",
                 error=raw_or_error,
             )
 
     except (ValueError, ConnectionError) as e:
-        phase_state.status = PhaseStatus.FAILED
-        phase_state.error = str(e)
-        session.touch()
+        repo.create_artifact_version(
+            session_id=session.id,
+            phase_id=phase.id,
+            source="llm",
+            status="failed",
+            error=str(e),
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================
-# Artifact Retrieval & Editing
+# Artifact Retrieval, Editing & History
 # =============================================================================
 
 
 @router.get("/{phase_id}/artifact", response_model=ArtifactResponse)
-async def get_artifact(session_id: str, phase_id: str) -> ArtifactResponse:
-    """
-    Get the artifact for a completed phase.
+def get_artifact(
+    session_id: str,
+    phase_id: str,
+    repo: SessionRepository = Depends(get_repository),
+) -> ArtifactResponse:
+    """Get the latest artifact version for a phase."""
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-    Returns the artifact data as a JSON object matching the phase's
-    Pydantic schema.
-    """
-    session = _get_session_or_404(session_id)
-    phase = _get_phase_or_404(phase_id)
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
 
-    phase_state = session.phases.get(phase.id)
-    if not phase_state or phase_state.artifact is None:
+    db_artifact = repo.get_latest_artifact(session_id, phase_id)
+    if db_artifact is None or db_artifact.content is None:
         raise HTTPException(
             status_code=404,
-            detail=f"No artifact found for phase '{phase.name}'. Run the phase first.",
+            detail=f"No artifact for phase '{phase.name}'. Run the phase first.",
         )
 
     return ArtifactResponse(
         phase_id=phase.id,
         phase_name=phase.name,
-        artifact=phase_state.artifact,
+        version=db_artifact.version,
+        source=db_artifact.source,
+        artifact=db_artifact.content,
     )
 
 
 @router.put("/{phase_id}/artifact", response_model=UpdateArtifactResponse)
-async def update_artifact(
+def update_artifact(
     session_id: str,
     phase_id: str,
     request: UpdateArtifactRequest,
+    repo: SessionRepository = Depends(get_repository),
 ) -> UpdateArtifactResponse:
     """
     Update a phase artifact (human edit).
 
+    Creates a new version with source='human'. The previous version is preserved.
     The edited artifact is validated against the phase's Pydantic schema.
-    If validation passes, the artifact is stored and the phase is marked
-    as completed. Downstream phases are NOT invalidated automatically.
-
-    Re-run validation via POST .../validate after editing.
     """
-    session = _get_session_or_404(session_id)
-    phase = _get_phase_or_404(phase_id)
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-    # Validate the edited artifact against the schema
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
+
+    # Validate against schema
     try:
         validated = phase.output_schema.model_validate(request.artifact)
     except Exception as e:
@@ -234,21 +214,58 @@ async def update_artifact(
     artifact_dict = json.loads(validated.model_dump_json())
 
     # Run validation
-    validation_dict = run_validation_on_artifact(session, phase, artifact_dict)
+    latest_artifacts = repo.get_latest_artifacts(session_id)
+    validation_dict = run_validation_on_artifact(latest_artifacts, phase, artifact_dict)
 
-    # Update session
-    phase_state = session.phases[phase.id]
-    phase_state.artifact = artifact_dict
-    phase_state.status = PhaseStatus.COMPLETED
-    phase_state.validation_report = validation_dict
-    phase_state.completed_at = datetime.now(timezone.utc).isoformat()
-    session.touch()
+    # Create new version
+    db_artifact = repo.create_artifact_version(
+        session_id=session.id,
+        phase_id=phase.id,
+        source="human",
+        status="completed",
+        content=artifact_dict,
+        validation_report=validation_dict,
+    )
 
     return UpdateArtifactResponse(
         phase_id=phase.id,
         phase_name=phase.name,
+        version=db_artifact.version,
+        source="human",
         artifact=artifact_dict,
         validation=validation_dict,
+    )
+
+
+@router.get("/{phase_id}/history", response_model=ArtifactHistoryResponse)
+def get_artifact_history(
+    session_id: str,
+    phase_id: str,
+    repo: SessionRepository = Depends(get_repository),
+) -> ArtifactHistoryResponse:
+    """Get all versions of a phase artifact."""
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
+
+    versions = repo.get_artifact_history(session_id, phase_id)
+
+    return ArtifactHistoryResponse(
+        phase_id=phase.id,
+        phase_name=phase.name,
+        versions=[
+            ArtifactVersionSummary(
+                version=v.version,
+                source=v.source,
+                status=v.status,
+                created_at=v.created_at.isoformat(),
+            )
+            for v in versions
+        ],
     )
 
 
@@ -258,35 +275,41 @@ async def update_artifact(
 
 
 @router.post("/{phase_id}/validate", response_model=ValidationResponse)
-async def validate_phase(session_id: str, phase_id: str) -> ValidationResponse:
-    """
-    Re-run validation on a phase artifact.
+def validate_phase(
+    session_id: str,
+    phase_id: str,
+    repo: SessionRepository = Depends(get_repository),
+) -> ValidationResponse:
+    """Re-run validation on the latest phase artifact."""
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-    Useful after editing an artifact to check if the changes fix
-    validation issues or introduce new ones.
-    """
-    session = _get_session_or_404(session_id)
-    phase = _get_phase_or_404(phase_id)
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
 
-    phase_state = session.phases.get(phase.id)
-    if not phase_state or phase_state.artifact is None:
+    db_artifact = repo.get_latest_artifact(session_id, phase_id)
+    if db_artifact is None or db_artifact.content is None:
         raise HTTPException(
             status_code=404,
             detail=f"No artifact for phase '{phase.name}'. Run the phase first.",
         )
 
-    validation_dict = run_validation_on_artifact(
-        session, phase, phase_state.artifact,
-    )
+    latest_artifacts = repo.get_latest_artifacts(session_id)
+    validation_dict = run_validation_on_artifact(latest_artifacts, phase, db_artifact.content)
     if validation_dict is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to validate artifact",
-        )
+        raise HTTPException(status_code=500, detail="Failed to validate artifact")
 
-    # Store updated validation
-    phase_state.validation_report = validation_dict
-    session.touch()
+    # Create a new version with updated validation
+    repo.create_artifact_version(
+        session_id=session.id,
+        phase_id=phase.id,
+        source=db_artifact.source,
+        status="completed",
+        content=db_artifact.content,
+        validation_report=validation_dict,
+    )
 
     return ValidationResponse(
         phase_id=phase.id,
@@ -296,17 +319,22 @@ async def validate_phase(session_id: str, phase_id: str) -> ValidationResponse:
 
 
 @router.get("/{phase_id}/validation", response_model=ValidationResponse)
-async def get_validation(session_id: str, phase_id: str) -> ValidationResponse:
-    """
-    Get the latest validation report for a phase.
+def get_validation(
+    session_id: str,
+    phase_id: str,
+    repo: SessionRepository = Depends(get_repository),
+) -> ValidationResponse:
+    """Get the validation report from the latest artifact version."""
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-    Returns the validation report from the most recent run or validation.
-    """
-    session = _get_session_or_404(session_id)
-    phase = _get_phase_or_404(phase_id)
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
 
-    phase_state = session.phases.get(phase.id)
-    if not phase_state or phase_state.validation_report is None:
+    db_artifact = repo.get_latest_artifact(session_id, phase_id)
+    if db_artifact is None or db_artifact.validation_report is None:
         raise HTTPException(
             status_code=404,
             detail=f"No validation report for phase '{phase.name}'.",
@@ -315,5 +343,5 @@ async def get_validation(session_id: str, phase_id: str) -> ValidationResponse:
     return ValidationResponse(
         phase_id=phase.id,
         phase_name=phase.name,
-        validation=phase_state.validation_report,
+        validation=db_artifact.validation_report,
     )

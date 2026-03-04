@@ -1,11 +1,10 @@
 """
-FastAPI application factory for the DDD pipeline API.
+FastAPI application for the DDD pipeline API.
 
-Provides a REST API for the HITL (Human-in-the-Loop) pipeline workflow:
+Provides a REST API for the HITL pipeline workflow:
 - Create sessions with requirements + model config
 - Run phases individually with human review between each
 - Edit artifacts and re-validate
-- Track progress across all 5 DDD phases
 
 Run with:
     uvicorn main:app --reload --port 8000
@@ -17,10 +16,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables before LangChain imports (enables LangSmith tracing)
+# Load environment variables before any LangChain/DB imports
 load_dotenv()
 
 from api.routes import health, sessions, phases  # noqa: E402
+from db.database import Base, engine  # noqa: E402
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +28,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
 )
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -45,8 +46,8 @@ def create_app() -> FastAPI:
     application.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:3000",  # Next.js dev server
-            "http://localhost:5173",  # Vite dev server
+            "http://localhost:3000",
+            "http://localhost:5173",
         ],
         allow_credentials=True,
         allow_methods=["*"],
@@ -57,6 +58,14 @@ def create_app() -> FastAPI:
     application.include_router(health.router, prefix="/api")
     application.include_router(sessions.router, prefix="/api")
     application.include_router(phases.router, prefix="/api")
+
+    @application.on_event("startup")
+    def on_startup() -> None:
+        """Create database tables on startup."""
+        # Import models so Base.metadata knows about them
+        import db.models  # noqa: F401
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified")
 
     return application
 

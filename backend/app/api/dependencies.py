@@ -1,124 +1,39 @@
 """
-Dependency injection for the FastAPI application.
+FastAPI dependency injection.
 
 Provides:
-- SessionStore: In-memory session store (will be replaced with DB in Phase C)
-- PipelineSession: Session data model
-- Helper functions to resolve phases and build WorkflowState from sessions
-
-Design note:
-    All state is stored in-memory. This is intentional for now —
-    Phase C will introduce PostgreSQL persistence.
+- Database session via get_db
+- SessionRepository via get_repository
+- Helper functions for phase lookup, prerequisite checking, and validation
 """
 
 from __future__ import annotations
 
 import json
-import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 
+from fastapi import Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session as DBSession
 
-from api.schemas import PhaseStatus
+from db.database import get_db
+from db.models import Artifact, Session
+from db.repository import SessionRepository
 from pipeline_config import PHASES, PhaseConfig, WorkflowState
 from validation import ValidationEngine
-from validation.models import ValidationReport
 
 
 # =============================================================================
-# Session Data Model
+# FastAPI Dependencies
 # =============================================================================
 
 
-@dataclass
-class PhaseState:
-    """State of a single phase within a session."""
-    status: PhaseStatus = PhaseStatus.PENDING
-    artifact: dict | None = None
-    raw_response: str | None = None
-    validation_report: dict | None = None
-    error: str | None = None
-    completed_at: str | None = None
-
-
-@dataclass
-class PipelineSession:
-    """
-    A pipeline session tracks the state of a HITL workflow.
-
-    The user creates a session with requirements + model config,
-    then runs phases one at a time, reviewing artifacts between phases.
-    """
-    id: str
-    requirements_text: str
-    requirements_name: str
-    provider: str
-    model: str
-    temperature: float
-    api_key: str | None
-    phases: dict[str, PhaseState] = field(default_factory=dict)
-    created_at: str = ""
-    updated_at: str = ""
-
-    def __post_init__(self) -> None:
-        now = datetime.now(timezone.utc).isoformat()
-        if not self.created_at:
-            self.created_at = now
-        if not self.updated_at:
-            self.updated_at = now
-        # Initialize all phase states
-        if not self.phases:
-            for phase in PHASES:
-                self.phases[phase.id] = PhaseState()
-
-    def touch(self) -> None:
-        """Update the updated_at timestamp."""
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+def get_repository(db: DBSession = Depends(get_db)) -> SessionRepository:
+    """Provide a SessionRepository backed by the current DB session."""
+    return SessionRepository(db)
 
 
 # =============================================================================
-# Session Store (in-memory, replaced with DB in Phase C)
-# =============================================================================
-
-
-class SessionStore:
-    """
-    In-memory session store.
-
-    Thread-safety note: For development only. Production deployments
-    should use the database-backed store from Phase C.
-    """
-
-    def __init__(self) -> None:
-        self._sessions: dict[str, PipelineSession] = {}
-
-    def create(self, session: PipelineSession) -> PipelineSession:
-        self._sessions[session.id] = session
-        return session
-
-    def get(self, session_id: str) -> PipelineSession | None:
-        return self._sessions.get(session_id)
-
-    def list_all(self) -> list[PipelineSession]:
-        return list(self._sessions.values())
-
-    def delete(self, session_id: str) -> bool:
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            return True
-        return False
-
-
-# =============================================================================
-# Singleton store instance
-# =============================================================================
-
-session_store = SessionStore()
-
-
-# =============================================================================
-# Helper Functions
+# Phase Lookup Helpers
 # =============================================================================
 
 
@@ -138,21 +53,30 @@ def get_phase_by_output_key(output_key: str) -> PhaseConfig | None:
     return None
 
 
-def check_phase_prerequisites(session: PipelineSession, phase: PhaseConfig) -> str | None:
+# =============================================================================
+# Business Logic Helpers
+# =============================================================================
+
+
+def check_phase_prerequisites(
+    artifacts: list[Artifact],
+    phase: PhaseConfig,
+) -> str | None:
     """
-    Check whether a phase's prerequisites are met.
+    Check whether a phase's input prerequisites are met.
 
     Returns None if OK, or an error message describing what's missing.
     """
+    artifact_map = {a.phase_id: a for a in artifacts}
+
     for inp in phase.inputs:
         if inp == "requirements":
-            continue  # Always available from session
-        # Find the phase that produces this input
+            continue
         producer = get_phase_by_output_key(inp)
         if producer is None:
             return f"Unknown input '{inp}' — no phase produces it"
-        producer_state = session.phases.get(producer.id)
-        if producer_state is None or producer_state.status != PhaseStatus.COMPLETED:
+        producer_artifact = artifact_map.get(producer.id)
+        if producer_artifact is None or producer_artifact.status != "completed":
             return (
                 f"Phase '{producer.name}' must be completed before "
                 f"running '{phase.name}' (provides '{inp}')"
@@ -161,16 +85,18 @@ def check_phase_prerequisites(session: PipelineSession, phase: PhaseConfig) -> s
 
 
 def build_workflow_state(
-    session: PipelineSession,
+    session: Session,
+    artifacts: list[Artifact],
     phase: PhaseConfig,
 ) -> WorkflowState:
     """
-    Build a WorkflowState from session data for phase execution.
+    Build a WorkflowState from DB data for phase execution.
 
-    Converts stored artifact dicts back to Pydantic models so the
-    pipeline service can use them in prompts and validation.
+    Converts stored JSONB artifact content back to Pydantic models
+    so PipelineService can use them in prompts and validation.
     """
-    artifacts: dict[str, BaseModel] = {}
+    artifact_map = {a.phase_id: a for a in artifacts}
+    pydantic_artifacts: dict[str, BaseModel] = {}
 
     for inp in phase.inputs:
         if inp == "requirements":
@@ -178,11 +104,10 @@ def build_workflow_state(
         producer = get_phase_by_output_key(inp)
         if producer is None:
             continue
-        phase_state = session.phases.get(producer.id)
-        if phase_state and phase_state.artifact:
-            # Convert dict back to Pydantic model
-            artifacts[inp] = producer.output_schema.model_validate(
-                phase_state.artifact,
+        db_artifact = artifact_map.get(producer.id)
+        if db_artifact and db_artifact.content:
+            pydantic_artifacts[inp] = producer.output_schema.model_validate(
+                db_artifact.content,
             )
 
     domain = session.requirements_name.lower().replace(" ", "_")
@@ -192,12 +117,12 @@ def build_workflow_state(
         provider=session.provider,
         model=session.model,
         requirements_text=session.requirements_text,
-        artifacts=artifacts,
+        artifacts=pydantic_artifacts,
     )
 
 
 def run_validation_on_artifact(
-    session: PipelineSession,
+    artifacts: list[Artifact],
     phase: PhaseConfig,
     artifact_dict: dict,
 ) -> dict | None:
@@ -208,22 +133,27 @@ def run_validation_on_artifact(
     and returns the serialized report.
     """
     engine = ValidationEngine()
+    artifact_map = {a.phase_id: a for a in artifacts}
 
-    # Build artifacts dict with Pydantic models
-    artifacts: dict[str, BaseModel] = {}
+    pydantic_artifacts: dict[str, BaseModel] = {}
     for p in PHASES:
-        ps = session.phases.get(p.id)
-        if ps and ps.artifact and p.id != phase.id:
+        if p.id == phase.id:
+            continue
+        db_artifact = artifact_map.get(p.id)
+        if db_artifact and db_artifact.content:
             try:
-                artifacts[p.output_key] = p.output_schema.model_validate(ps.artifact)
+                pydantic_artifacts[p.output_key] = p.output_schema.model_validate(
+                    db_artifact.content,
+                )
             except Exception:
                 pass
 
-    # Add the artifact being validated
     try:
-        artifacts[phase.output_key] = phase.output_schema.model_validate(artifact_dict)
+        pydantic_artifacts[phase.output_key] = phase.output_schema.model_validate(
+            artifact_dict,
+        )
     except Exception:
         return None
 
-    report = engine.validate_phase(phase.id, artifacts)
+    report = engine.validate_phase(phase.id, pydantic_artifacts)
     return json.loads(report.model_dump_json())
