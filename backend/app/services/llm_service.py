@@ -185,7 +185,7 @@ class LLMService:
         except Exception as e:
             raise ConnectionError(f"Failed to connect to Ollama: {e}") from e
 
-    def _init_openrouter(self, max_tokens: int = 16384) -> ChatOpenAI:
+    def _init_openrouter(self, max_tokens: int = 64000) -> ChatOpenAI:
         """
         Initialize OpenRouter LLM via OpenAI-compatible API.
 
