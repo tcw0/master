@@ -31,7 +31,7 @@ export default function HomePage() {
   const [requirementsText, setRequirementsText] = useState("");
   const [requirementsName, setRequirementsName] = useState("requirements");
   const [provider, setProvider] = useState("openrouter");
-  const [model, setModel] = useState("openai/gpt-4.1-mini");
+  const [model, setModel] = useState("openai/gpt-5.1-codex-mini");
   const [temperature, setTemperature] = useState(0.3);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function HomePage() {
                 id="model"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. openai/gpt-4.1-mini"
+                placeholder="e.g. openai/gpt-5.1-codex-mini"
               />
             </div>
             <div className="space-y-2">
