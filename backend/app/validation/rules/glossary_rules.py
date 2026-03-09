@@ -30,7 +30,7 @@ def no_duplicate_terms(artifacts: dict[str, BaseModel]) -> list[ValidationResult
         return []
 
     results: list[ValidationResult] = []
-    term_names = [t.term.strip().lower() for t in glossary.terms]
+    term_names = [t.name.strip().lower() for t in glossary.terms]
     counts = Counter(term_names)
 
     duplicates = {name: count for name, count in counts.items() if count > 1}

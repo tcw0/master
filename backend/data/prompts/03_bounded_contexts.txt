@@ -1,72 +1,69 @@
-Task: Identify and Map Bounded Contexts
+Identify and map Bounded Contexts based on the requirements, glossary, and event storming results from the previous phases.
 
-Based on the requirements, glossary, and event storming analysis, identify bounded contexts and create a context map.
-
-## Requirements Document
+# Requirements
 
 {requirements}
 
-## Ubiquitous Language Glossary (from Phase 1)
+# Glossary (from Phase 1)
 
 {glossary}
 
-## Event Storming Results (from Phase 2)
+# Event Storming Results (from Phase 2)
 
 {events}
 
-## Instructions
+# Instructions
 
-### 1. Identify Bounded Contexts
-Group related domain concepts into bounded contexts. For each context:
-- **name**: Context name (e.g., 'Reservation', 'Billing', 'Identity')
-- **purpose**: Core purpose and single responsibility
-- **classification**: One of 'core' (competitive advantage), 'supporting' (necessary but not differentiating), 'generic' (could be off-the-shelf)
-- **key_aggregates**: Main aggregates in this context
-- **ubiquitous_language_terms**: Glossary terms specific to this context
-- **owned_events**: Domain events published by this context
-- **handled_commands**: Commands processed by this context
-- **team_ownership**: Suggested team or ownership area (optional)
-- **boundary_concerns**: Any concerns about size or clarity (optional)
+Analyze the domain model to identify bounded contexts — cohesive areas of the domain where a specific ubiquitous language applies consistently. Then map the relationships between these contexts.
 
-### 2. Define Context Relationships
-Map how contexts interact. For each relationship:
-- **upstream_context**: The supplier/provider context
-- **downstream_context**: The consumer context
-- **relationship_type**: One of:
-  - 'partnership': Two contexts cooperate as equals
-  - 'shared_kernel': Shared subset of domain model
-  - 'customer_supplier': Upstream/downstream with negotiation
-  - 'conformist': Downstream conforms to upstream
-  - 'anticorruption_layer': Downstream protects itself
-  - 'open_host_service': Upstream provides well-defined protocol
-  - 'published_language': Shared language for communication
-  - 'separate_ways': No integration
-- **description**: How these contexts interact
-- **integration_style**: 'synchronous_api', 'asynchronous_events', 'shared_database', 'file_transfer', 'none'
-- **acl_needed**: Whether Anti-Corruption Layer is recommended
-- **acl_rationale**: Why ACL is needed (if applicable)
+## Step 1: Identify Bounded Contexts
 
-### 3. Identify External Systems
-List external systems that contexts integrate with:
-- **name**: System name (e.g., 'PaymentGateway', 'EmailService')
-- **description**: What it provides
-- **integration_contexts**: Which contexts integrate with it
-- **integration_style**: How they integrate
-- **acl_recommended**: Whether ACL is recommended
+Look for natural boundaries in the domain by examining:
+- **Linguistic boundaries**: terms that have different meanings in different parts of the domain suggest separate contexts
+- **Process boundaries**: aggregates and events that participate in the same business processes often belong to the same context
+- **Organizational boundaries**: different teams or departments often correspond to different contexts
+- **Data ownership**: entities that are owned and primarily managed by the same part of the business belong together
 
-### 4. Document Shared Terms
-Identify terms with different meanings across contexts:
-- **term**: The ambiguous term
-- **definitions_by_context**: Map of context -> meaning
-- **translation_strategy**: How to handle translation
+For each bounded context, provide:
+- A clear, descriptive name
+- Its core purpose: what business capability does it own? (one or two sentences)
+- Strategic classification (domain_type):
+  - "core": key competitive differentiator, high business value, requires deep domain expertise
+  - "supporting": necessary but not a differentiator, supports core contexts
+  - "generic": commodity capability that could be outsourced or replaced by an off-the-shelf solution (e.g., authentication, email, notifications)
+- Key aggregates: which aggregates from the event storming belong here
+- Ubiquitous language terms: which glossary terms are specific to this context
 
-### 5. Strategic Classification
-- **core_domain**: Which context provides competitive advantage
-- **core_domain_rationale**: Why it's core
-- **supporting_domains** and **generic_domains**: Lists of other contexts
+## Step 2: Define Context Relationships (Context Map)
 
-### 6. Recommendations
-- **boundary_recommendations**: Suggestions for splitting or merging
-- **integration_concerns**: Concerns about context integrations
+For every pair of contexts that interact, define the relationship using one of these DDD integration patterns:
+- "upstream_downstream": one context provides data/services that another depends on
+- "shared_kernel": two contexts share a common sub-model that both teams co-own
+- "customer_supplier": the downstream context can negotiate requirements with the upstream
+- "conformist": the downstream context accepts whatever the upstream provides
+- "anti_corruption_layer": the downstream context translates foreign concepts to protect its own model
+- "published_language": the upstream context publishes a well-defined shared language (e.g., an API schema)
+- "open_host_service": the upstream context provides an open protocol for multiple consumers
+- "partnership": two contexts evolve together with mutual coordination
+- "separate_ways": two contexts have no integration and operate independently
 
-Question any contexts that seem too large or have unclear boundaries.
+For each relationship:
+- source_context is the upstream / provider context
+- target_context is the downstream / consumer context
+- Provide a description explaining how the contexts interact
+
+## Step 3: Identify Term Overlaps
+
+List any terms from the glossary that have different meanings in different bounded contexts. For each overlapping term:
+- Name the term
+- For each context where it appears, explain what it means in that specific context
+
+These term overlaps are critical signals for correct context boundaries and anti-corruption layer design.
+
+## Design principles to apply
+
+- **Prefer smaller, focused contexts** over large monolithic ones
+- **Each aggregate should belong to exactly one bounded context** — if an aggregate seems to span contexts, it may need to be split
+- **A bounded context should have a single, clear purpose** — if you struggle to state it in one sentence, the context may be too broad
+- **Avoid creating a "generic/shared" context** as a catch-all — each context should own specific behavior
+- **Question any context with more than 5-6 aggregates** — consider whether it should be split

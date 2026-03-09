@@ -1,74 +1,72 @@
-Task: Conduct Event Storming Analysis
+Conduct an Event Storming analysis based on the requirements and the ubiquitous language glossary established in the previous phase.
 
-Based on the requirements and the ubiquitous language glossary, conduct an Event Storming session to identify domain events, commands, actors, and policies.
-
-## Requirements Document
+# Requirements
 
 {requirements}
 
-## Ubiquitous Language Glossary (from Phase 1)
+# Glossary (from Phase 1)
 
 {glossary}
 
-## Instructions
+# Instructions
 
-### 1. Identify Actors
-List all actors/roles that interact with the system:
-- **name**: Actor name (e.g., 'Guest', 'Admin', 'PaymentGateway')
-- **type**: One of 'user', 'external_system', 'time' (scheduler), 'policy'
-- **description**: Role responsibilities
+Perform a systematic Event Storming session. Identify all domain events, the commands that trigger them, the actors who initiate those commands, the aggregates that process them, and any reactive policies. Then organize these elements into coherent business process flows.
 
-### 2. Identify Domain Events
-Events are things that happen in the domain (past tense). For each event:
-- **name**: Event name in PastTense (e.g., 'RoomBooked', 'PaymentReceived')
-- **description**: What this event represents in business terms
-- **category**: One of 'domain_event', 'integration_event', 'system_event'
-- **aggregate**: The aggregate that emits this event
-- **triggered_by**: The command that causes this event
-- **payload**: Key data attributes carried by the event
-- **triggers_policies**: Policy names that react to this event
+## Step 1: Identify Commands
 
-### 3. Identify Commands
-Commands are intentions to change state (imperative form). For each command:
-- **name**: Command name (e.g., 'BookRoom', 'CancelBooking')
-- **description**: What this command intends to accomplish
-- **category**: One of 'user_command', 'system_command', 'policy_command'
-- **actor**: Who initiates this command
-- **target_aggregate**: Which aggregate handles it
-- **parameters**: Input parameters required
-- **preconditions**: What must be true before execution
-- **produces_events**: Events produced on success
+Identify every action that an actor can initiate in the system.
+- Name commands in imperative form: "PlaceOrder", "RegisterUser", "ApproveApplication"
+- For each command, identify who initiates it (the actor — use role names from the glossary)
+- For each command, identify which aggregate handles it (the target_aggregate — use entity names from the glossary)
 
-### 4. Identify Policies
-Policies react to events and may trigger new commands. For each policy:
-- **name**: Policy name (e.g., 'SendConfirmationOnBooking')
-- **description**: What this policy does
-- **triggered_by_event**: The event that activates it
-- **condition**: When the policy fires (if conditional)
-- **resulting_commands**: Commands triggered by this policy
-- **is_automated**: Whether it runs automatically
+## Step 2: Identify Domain Events
 
-### 5. Capture Event Flows
-Document key scenarios as flows:
-- **name**: Flow name (e.g., 'Happy Path Booking')
-- **description**: What this flow represents
-- **steps**: An array where EACH step is a SEPARATE string element. 
-  CORRECT: ["Guest", "BookRoom", "Booking", "RoomBooked", "SendConfirmationPolicy", "SendEmail"]
-  WRONG: ["Guest -> BookRoom -> Booking"] (do NOT use arrows or concatenate)
-- **is_happy_path**: Whether this is the main success scenario
+For each command, determine what domain event(s) it produces when successfully executed.
+- Name events in past tense: "OrderPlaced", "UserRegistered", "ApplicationApproved"
+- Every event must be traceable to exactly one triggering command
+- Every event must be emitted by exactly one aggregate
+- Use names consistent with the glossary terms
 
-### 6. Identify Hot Spots
-Flag areas of uncertainty:
-- **description**: What is unclear or contentious
-- **related_elements**: Names of elements involved
-- **questions**: Questions to resolve this
+## Step 3: Identify Policies
 
-### 7. Additional Analysis
-- **aggregates_mentioned**: List aggregate names identified
-- **temporal_boundaries**: Time-based boundaries (e.g., 'Check-in time')
-- **parallel_processes**: Processes that can happen concurrently
+Policies are reactive business rules that listen for events and may trigger follow-up commands.
+- Name policies descriptively: "Send Confirmation Email Policy", "Auto-Cancel Expired Reservations"
+- Each policy is triggered by exactly one event
+- If a policy initiates a follow-up action, specify the resulting_command; otherwise set it to null
+- Not every event triggers a policy — many events are terminal
 
-Conceptual flow pattern: Actor -> Command -> Aggregate -> Event(s) -> Policy -> Next Command
+## Step 4: Organize into Flows
 
-IMPORTANT: In the steps array, each element must be a separate string. Never concatenate with arrows.
+Group related events into named business process flows (e.g., "Order Fulfillment", "User Onboarding", "Payment Processing"). Each flow represents an end-to-end business process.
 
+For each flow, create an ordered sequence of steps. Each step represents one sticky-note group in a classic Event Storming board and must specify:
+- actor: who initiates the action
+- command: what action is performed
+- aggregate: which aggregate handles it
+- event: what domain event is produced
+- policy: if a reactive policy is triggered, name it (null otherwise)
+- next_command: if the policy triggers a follow-up command, name it (null otherwise)
+
+Steps within a flow should follow the temporal/causal order of the business process.
+
+## Step 5: Flag ambiguities
+
+List any areas where:
+- The event flow is unclear or could be interpreted multiple ways
+- The requirements do not specify who initiates an action or what happens next
+- There are potential race conditions or parallel processes that need clarification
+
+## Naming conventions
+
+- Commands: imperative verb + noun (e.g., "PlaceOrder", "CancelBooking")
+- Events: past tense verb + noun (e.g., "OrderPlaced", "BookingCancelled")
+- Aggregates: singular nouns matching glossary entity terms (e.g., "Order", "Booking")
+- Actors: role names matching glossary role terms (e.g., "Customer", "Administrator")
+- Policies: descriptive name of the business rule (e.g., "Reservation Expiration Policy")
+
+## Consistency requirements
+
+- Every command name used in flows must appear in the commands list
+- Every event name used in flows must appear in the domain_events list
+- Every policy name used in flows must appear in the policies list
+- Aggregate and actor names should match terms from the glossary

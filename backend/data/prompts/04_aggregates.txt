@@ -1,100 +1,78 @@
-Task: Design Aggregates for Each Bounded Context
+Design aggregates for each bounded context based on the glossary, event storming results, and bounded context definitions from the previous phases.
 
-Based on the glossary, event storming, and bounded contexts, design the aggregates with clear consistency boundaries.
-
-## Ubiquitous Language Glossary (from Phase 1)
+# Glossary (from Phase 1)
 
 {glossary}
 
-## Event Storming Results (from Phase 2)
+# Event Storming Results (from Phase 2)
 
 {events}
 
-## Bounded Contexts (from Phase 3)
+# Bounded Contexts (from Phase 3)
 
 {bounded_contexts}
 
-## Instructions
+# Instructions
 
-### 1. Design Each Aggregate
-For each aggregate identified in the bounded contexts:
+For each bounded context, design its aggregates — the transactional consistency boundaries that protect business invariants. An aggregate is a cluster of domain objects (entities and value objects) treated as a single unit for data changes.
 
-**Basic Information:**
-- **name**: Aggregate name in PascalCase (e.g., 'Booking', 'Room')
-- **description**: Purpose of this aggregate
-- **bounded_context**: Which context it belongs to
-- **root_entity**: Name of the aggregate root entity
-- **identity**: The identity attribute (name, type, description)
+## Step 1: Identify Aggregates and their Roots
 
-**Root Attributes:**
-List attributes of the aggregate root (excluding identity):
-- **name**: Attribute name in camelCase
-- **type**: Data type (string, DateTime, or custom type name)
-- **is_required**: Whether required
-- **description**: Business meaning (optional)
+For each bounded context, determine which aggregates it contains:
+- Each aggregate has exactly one root entity — the single entry point through which all external interactions occur
+- The aggregate root controls access to all contained entities and value objects
+- Use names consistent with the glossary terms and the aggregates mentioned in the event storming
+- Assign each aggregate to exactly one bounded context (using the context names from Phase 3)
 
-**Contained Elements:**
+## Step 2: Define Contained Elements
 
-*Entities* (child entities with identity, lifecycle controlled by root):
-- **name**: Entity name
-- **description**: What it represents
-- **identity_attribute**: What uniquely identifies it
-- **attributes**: List of attributes
-- **value_objects**: VOs used by this entity
-- **relationship_to_root**: How it relates to the root
+For each aggregate, list its internal entities and value objects:
+- Entities (element_type: "entity") have a unique identity and lifecycle — their identity persists even when attributes change
+- Value Objects (element_type: "value_object") are defined entirely by their attributes — two value objects with the same attributes are interchangeable
+- For each element, list its key properties (the most important attributes, not an exhaustive schema)
+- Keep aggregates small: prefer value objects over entities where identity is not needed
 
-*Value Objects* (immutable, identity-less):
-- **name**: VO name (e.g., 'TimeSlot', 'EmailAddress')
-- **description**: What it represents
-- **attributes**: Attributes that define it
-- **validation_rules**: Rules for validity
-- **is_reusable**: Whether used across aggregates
+## Step 3: Define Invariants
 
-*Enums* (fixed set of values):
-- **name**: Enum name (e.g., 'BookingStatus')
-- **description**: What it represents
-- **values**: List of values in UPPER_SNAKE_CASE
+Invariants are business rules that the aggregate must enforce at all times. They represent the "protection boundary" of the aggregate.
+- Name each invariant concisely (e.g., "Maximum Occupancy", "Positive Balance Required")
+- Describe the rule in domain language ("A room cannot have more guests than its capacity")
+- Good invariants are verifiable — they can be checked programmatically
+- Every aggregate should have at least one invariant; if you cannot identify one, the aggregate boundary may be wrong
 
-**Behavior:**
+## Step 4: Define Commands
 
-*Invariants* (business rules to protect):
-- **name**: Short invariant name
-- **description**: The business rule in plain language
-- **enforcement**: How it's enforced
+Each aggregate handles commands — operations that change its state:
+- Name commands in imperative form, consistent with the event storming (e.g., "PlaceOrder", "CancelBooking")
+- Describe what the command does in business terms
+- List the key input parameters
+- For each command, list which domain events it emits on success (use event names from Phase 2)
+- For each command, list which invariants are checked (using invariant names from Step 3)
 
-*Commands* (operations the aggregate handles):
-- **name**: Command name (e.g., 'createBooking', 'cancel')
-- **description**: What it does
-- **parameters**: Input parameters
-- **preconditions**: What must be true before
-- **postconditions**: State after success
-- **events_raised**: Events produced
-- **exceptions**: Errors that can occur
+## Step 5: Evaluate Aggregate Size
 
-*Domain Events* (events this aggregate publishes):
-- List of event names
+Assess each aggregate's size as:
+- "small": 1-2 entities + a few value objects — ideal for concurrency and simplicity
+- "moderate": 3-4 entities — acceptable if the consistency boundary requires it
+- "large": 5+ entities or a complex object graph — should be examined for potential splitting
 
-**Design Evaluation:**
-- **consistency_boundary**: What's consistent within this aggregate
-- **size_evaluation**: 'appropriate', 'possibly_too_large', 'possibly_too_small'
-- **size_notes**: Recommendations if concerns exist
-- **references_aggregates**: Other aggregates referenced by ID
+In the size_rationale, explain:
+- Why this aggregate groups these specific elements together
+- If the aggregate is "large", suggest how it could be split while preserving invariants
+- If elements could be extracted into a separate aggregate, note this
 
-### 2. Shared Value Objects
-List VOs used across multiple aggregates
+## Step 6: Document Design Decisions
 
-### 3. Cross-Aggregate Interactions
-Document event-based interactions between aggregates:
-- **source_aggregate**: Publisher
-- **event**: Event name
-- **target_aggregate**: Reactor
-- **reaction**: What happens
-- **consistency**: 'eventual' or 'saga'
+In design_decisions, list the key rationale behind your aggregate choices:
+- Why you grouped certain entities together
+- Why you separated elements that might seem related
+- Any trade-offs you made between consistency and performance
+- Alternative partitionings you considered and why you rejected them
 
-### 4. Design Concerns
-List any aggregates that may need restructuring
+## Design principles to apply
 
-### 5. Missing Invariants
-Note business rules not yet covered
-
-Ensure aggregates are small (for concurrency), focused on a single consistency boundary, and protect clear business invariants.
+- **Reference by identity across aggregate boundaries**: aggregates should reference other aggregates by ID, not by holding direct object references
+- **One transaction per aggregate**: a single command should modify only one aggregate
+- **Eventual consistency between aggregates**: if a business process spans multiple aggregates, use domain events to coordinate
+- **Prefer smaller aggregates**: when in doubt, make the aggregate smaller and use domain events for coordination
+- **Protect real invariants**: only group elements that must be consistent within a single transaction

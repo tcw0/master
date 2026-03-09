@@ -1,110 +1,78 @@
 """
-Pydantic models for DDD artifacts across all pipeline phases.
+Structured output models for the 5-phase DDD pipeline.
 
-Each phase produces a structured artifact:
-- Phase 1: GlossaryArtifact (Ubiquitous Language)
-- Phase 2: EventStormingArtifact (Events, Commands, Actors, Policies)
-- Phase 3: BoundedContextsArtifact (Context Map)
-- Phase 4: AggregatesArtifact (Aggregate Design)
-- Phase 5: ArchitectureArtifact (Technical Architecture)
+Each module defines the Pydantic schema that the LLM must produce
+via `with_structured_output()`. These are the artifact *payloads*
+stored in JSONB; persistence metadata is handled separately.
 """
 
-# Phase 1: Glossary (Ubiquitous Language)
-from .glossary import (
-    GlossaryTerm,
-    BoundedContextIndicator,
-    GlossaryArtifact,
-)
-
-# Phase 2: Event Storming
-from .event_storming import (
-    Actor,
-    DomainEvent,
-    Command,
-    Policy,
-    EventFlow,
-    HotSpot,
+from models.glossary import GlossaryArtifact, GlossaryTerm, BoundedContextHint
+from models.event_storming import (
     EventStormingArtifact,
+    Command,
+    DomainEvent,
+    Policy,
+    FlowStep,
+    EventFlow,
 )
-
-# Phase 3: Bounded Contexts
-from .bounded_contexts import (
+from models.bounded_contexts import (
+    BoundedContextsArtifact,
     BoundedContext,
     ContextRelationship,
-    SharedTerm,
-    ExternalSystem,
-    BoundedContextsArtifact,
+    ContextSpecificMeaning,
+    TermOverlap,
 )
-
-# Phase 4: Aggregates
-from .aggregates import (
-    Attribute,
-    ValueObject,
-    EnumDefinition,
-    Entity,
+from models.aggregates import (
+    AggregatesArtifact,
+    Aggregate,
+    AggregateElement,
     AggregateCommand,
     Invariant,
-    Aggregate,
-    CrossAggregateInteraction,
-    AggregatesArtifact,
 )
-
-# Phase 5: Architecture
-from .architecture import (
-    Component,
-    DomainLayer,
-    ApplicationLayer,
-    InfrastructureLayer,
-    PresentationLayer,
+from models.architecture import (
+    ArchitectureArtifact,
     HexagonalArchitecture,
+    DomainLayerElement,
+    ApplicationLayerElement,
+    InfrastructureLayerElement,
+    PresentationLayerElement,
     AntiCorruptionLayer,
     PublishedInterface,
     TechnicalPattern,
-    ContextArchitecture,
-    DeploymentUnit,
-    ArchitectureArtifact,
 )
 
 __all__ = [
     # Phase 1
-    "GlossaryTerm",
-    "BoundedContextIndicator",
     "GlossaryArtifact",
+    "GlossaryTerm",
+    "BoundedContextHint",
     # Phase 2
-    "Actor",
-    "DomainEvent",
-    "Command",
-    "Policy",
-    "EventFlow",
-    "HotSpot",
     "EventStormingArtifact",
+    "Command",
+    "DomainEvent",
+    "Policy",
+    "FlowStep",
+    "EventFlow",
     # Phase 3
+    "BoundedContextsArtifact",
     "BoundedContext",
     "ContextRelationship",
-    "SharedTerm",
-    "ExternalSystem",
-    "BoundedContextsArtifact",
+    "ContextSpecificMeaning",
+    "TermOverlap",
     # Phase 4
-    "Attribute",
-    "ValueObject",
-    "EnumDefinition",
-    "Entity",
+    "AggregatesArtifact",
+    "Aggregate",
+    "AggregateElement",
     "AggregateCommand",
     "Invariant",
-    "Aggregate",
-    "CrossAggregateInteraction",
-    "AggregatesArtifact",
     # Phase 5
-    "Component",
-    "DomainLayer",
-    "ApplicationLayer",
-    "InfrastructureLayer",
-    "PresentationLayer",
+    "ArchitectureArtifact",
     "HexagonalArchitecture",
+    "DomainLayerElement",
+    "ApplicationLayerElement",
+    "InfrastructureLayerElement",
+    "PresentationLayerElement",
     "AntiCorruptionLayer",
     "PublishedInterface",
     "TechnicalPattern",
-    "ContextArchitecture",
-    "DeploymentUnit",
-    "ArchitectureArtifact",
 ]

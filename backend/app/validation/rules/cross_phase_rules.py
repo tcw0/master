@@ -37,7 +37,7 @@ def terminology_consistency(artifacts: dict[str, BaseModel]) -> list[ValidationR
     results: list[ValidationResult] = []
 
     # Build normalized set of glossary term names
-    glossary_terms = {_normalize(t.term) for t in glossary.terms}
+    glossary_terms = {_normalize(t.name) for t in glossary.terms}
 
     # Check each aggregate name against glossary
     unmatched: list[str] = []

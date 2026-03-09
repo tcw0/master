@@ -1,96 +1,88 @@
-Task: Design Technical Architecture Following DDD Patterns
+Map the domain model to a technical hexagonal architecture based on the bounded contexts and aggregate designs from the previous phases.
 
-Based on the bounded contexts and aggregate designs, create the technical architecture following hexagonal/ports-and-adapters patterns.
-
-## Bounded Contexts (from Phase 3)
+# Bounded Contexts (from Phase 3)
 
 {bounded_contexts}
 
-## Aggregates (from Phase 4)
+# Aggregates (from Phase 4)
 
 {aggregates}
 
-## Instructions
+# Instructions
 
-### 1. Design Architecture Per Bounded Context
-For each bounded context, design the hexagonal architecture layers:
+For each bounded context, design a hexagonal (ports and adapters) architecture that separates domain logic from technical infrastructure. Also define anti-corruption layers between contexts and published interfaces for external communication.
 
-**Context Architecture:**
-- **context_name**: Name of the bounded context
-- **description**: Brief technical architecture description
-- **persistence_technology**: Database (e.g., 'PostgreSQL', 'MongoDB')
-- **messaging_technology**: Message broker if used (e.g., 'RabbitMQ')
+## Step 1: Map Each Bounded Context to a Hexagonal Architecture
 
-**Domain Layer** (pure business logic, no infrastructure):
-- **aggregates**: Aggregate names
-- **entities**: Entity classes
-- **value_objects**: Value object classes
-- **domain_services**: Services for cross-aggregate logic (name, type, description, dependencies)
-- **repository_interfaces**: Interface definitions (e.g., 'IBookingRepository')
-- **domain_events**: Event classes
-- **specifications**: Specification classes for queries
+For each bounded context, define elements in all four layers. Every element must have a name, type, and description of its responsibility.
 
-**Application Layer** (use case orchestration):
-- **application_services**: Application services (name, type, description, dependencies)
-- **command_handlers**: CQRS command handlers
-- **query_handlers**: CQRS query handlers
-- **event_handlers**: Domain event handlers
-- **dtos**: Data transfer objects
-- **commands**: Command DTOs
-- **queries**: Query DTOs
+### Domain Layer (innermost — pure business logic, no dependencies on infrastructure)
 
-**Infrastructure Layer** (technical implementations):
-- **repository_implementations**: Repository implementations (name, type, description, dependencies)
-- **persistence_models**: ORM/database models
-- **external_service_adapters**: External service adapters
-- **messaging_adapters**: Message queue adapters
-- **configuration**: Setup classes
+Identify elements of these types:
+- "entity": domain entities from the aggregate design (the aggregate roots and contained entities)
+- "value_object": value objects from the aggregate design
+- "domain_service": operations that do not naturally belong to a single entity — they coordinate logic across aggregates or encapsulate domain rules
+- "repository_interface": abstractions (interfaces/ports) for accessing aggregates — define the contract, not the implementation
+- "domain_event": events published by aggregates (from Phase 2)
 
-**Presentation Layer** (API/UI):
-- **controllers**: REST controllers
-- **graphql_resolvers**: GraphQL resolvers (if applicable)
-- **request_models**: API request DTOs
-- **response_models**: API response DTOs
-- **middleware**: Middleware components
+### Application Layer (orchestrates use cases, no domain logic)
 
-### 2. Anti-Corruption Layers
-For each ACL needed:
-- **name**: ACL name (e.g., 'PaymentGatewayACL')
-- **source_context**: External/upstream context
-- **target_context**: Protected context
-- **translator_services**: Translation services
-- **facade_interface**: Simplified interface
-- **translated_concepts**: What gets translated
-- **rationale**: Why ACL is needed
+Identify elements of these types:
+- "application_service": services that implement use cases by coordinating domain objects and infrastructure — one per major use case
+- "dto": data transfer objects for input/output of application services
+- "command": command objects representing write intentions (from Phase 2 commands)
+- "query": query objects representing read requests
+- "command_handler": handlers that process commands and delegate to domain objects
+- "query_handler": handlers that process queries and return DTOs
 
-### 3. Published Interfaces
-For each API/event interface:
-- **context_name**: Publishing context
-- **interface_type**: 'rest', 'graphql', 'grpc', 'events', 'websocket'
-- **name**: Interface name
-- **endpoints**: API endpoints (e.g., 'POST /bookings')
-- **events_published**: Published events
-- **consumers**: Consuming contexts
-- **versioning_strategy**: How versioned
+### Infrastructure Layer (technical adapters implementing ports)
 
-### 4. Technical Patterns
-Document patterns applied:
-- **pattern**: 'repository', 'unit_of_work', 'specification', 'domain_events', 'cqrs', 'event_sourcing', 'saga', 'outbox', 'factory', 'domain_service'
-- **applied_in**: Where used
-- **rationale**: Why chosen
-- **implementation_notes**: Specific guidance
+Identify elements of these types:
+- "repository_implementation": concrete implementations of domain layer repository interfaces (e.g., PostgreSQL, MongoDB)
+- "external_adapter": adapters for external systems (e.g., payment gateway, email service, third-party APIs)
+- "event_publisher": infrastructure for publishing domain events (e.g., message broker adapter, event bus)
+- "persistence_config": database schemas, ORM mappings, connection configuration
+- "messaging": message queue consumers, event listeners, integration adapters
 
-### 5. Integration Strategy
-- **integration_approach**: Overall strategy (e.g., 'Event-driven with REST for queries')
-- **event_bus_technology**: Central event bus if used
-- **api_gateway**: API gateway approach
+### Presentation Layer (outermost — external interface adapters)
 
-### 6. Deployment
-- **deployment_units**: Service groupings (name, contexts_included, rationale, scaling_considerations)
-- **deployment_approach**: Strategy (e.g., 'Kubernetes microservices', 'Modular monolith')
+Identify elements of these types:
+- "rest_controller": REST API endpoints exposing application services
+- "graphql_resolver": GraphQL resolvers (if applicable based on the domain)
+- "api_dto": request/response DTOs specific to the API format
+- "middleware": cross-cutting concerns such as authentication, logging, rate limiting
 
-### 7. Concerns and Recommendations
-- **infrastructure_concerns**: Technical risks
-- **recommendations**: Architecture recommendations
+## Step 2: Design Anti-Corruption Layers
 
-Show how each technical decision supports the domain model.
+For each pair of bounded contexts that requires model translation (identified by "anti_corruption_layer" or "conformist" relationships in Phase 3), define an ACL:
+- owning_context: the context that owns and maintains the ACL
+- foreign_context: the context whose model is being translated from
+- translation_description: what concepts are translated and how (e.g., "Translates external PaymentProvider events into internal Payment domain events")
+- translated_elements: the specific domain elements that pass through this ACL
+
+Even if no "anti_corruption_layer" relationship was explicitly identified in Phase 3, consider whether any upstream/downstream relationships would benefit from translation to protect the downstream model.
+
+## Step 3: Define Published Interfaces
+
+For each bounded context, define the interfaces it exposes for external consumption:
+- "rest_api": RESTful HTTP APIs
+- "graphql_api": GraphQL endpoints
+- "domain_events": events published for other contexts to subscribe to
+- "shared_kernel": shared model elements co-owned with another context
+
+Each interface should list its exposed_operations — the specific endpoints, event types, or shared model elements.
+
+## Step 4: Document Technical Patterns
+
+For each technical pattern applied, explain:
+- pattern_name: the name of the pattern (e.g., "Repository", "CQRS", "Specification", "Domain Events", "Saga", "Unit of Work")
+- applied_in_context: which bounded context uses this pattern
+- justification: why this pattern is appropriate — how it supports the domain model and what problem it solves
+
+## Architecture principles to apply
+
+- **Dependency rule**: dependencies point inward — domain layer has no dependencies on application, infrastructure, or presentation layers
+- **Domain purity**: the domain layer must be free of framework dependencies, database concerns, and I/O operations
+- **One context, one deployable**: each bounded context should be independently deployable
+- **Explicit interfaces**: all communication between contexts goes through published interfaces, never direct database access
+- **Test-friendly**: the hexagonal structure enables testing domain logic in isolation from infrastructure

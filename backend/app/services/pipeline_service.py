@@ -379,16 +379,14 @@ class PipelineService:
             summary_parts.append(f"{len(artifact.domain_events)} events")
         if hasattr(artifact, "commands"):
             summary_parts.append(f"{len(artifact.commands)} commands")
-        if hasattr(artifact, "contexts"):
-            summary_parts.append(f"{len(artifact.contexts)} contexts")
-        if hasattr(artifact, "relationships"):
-            summary_parts.append(f"{len(artifact.relationships)} relationships")
+        if hasattr(artifact, "bounded_contexts"):
+            summary_parts.append(f"{len(artifact.bounded_contexts)} contexts")
+        if hasattr(artifact, "context_relationships"):
+            summary_parts.append(f"{len(artifact.context_relationships)} relationships")
         if hasattr(artifact, "aggregates"):
             summary_parts.append(f"{len(artifact.aggregates)} aggregates")
-        if hasattr(artifact, "context_architectures"):
-            summary_parts.append(
-                f"{len(artifact.context_architectures)} context architectures",
-            )
+        if hasattr(artifact, "architectures"):
+            summary_parts.append(f"{len(artifact.architectures)} architectures")
 
         summary = ", ".join(summary_parts) if summary_parts else "completed"
         logger.info(f"✓ {phase.name}: {summary}")

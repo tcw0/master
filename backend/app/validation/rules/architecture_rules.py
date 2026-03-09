@@ -33,12 +33,12 @@ def contexts_coverage(artifacts: dict[str, BaseModel]) -> list[ValidationResult]
 
     # Build lookup of architecture definitions (case-insensitive)
     arch_context_names = {
-        ca.context_name.strip().lower()
-        for ca in arch_artifact.context_architectures
+        ca.bounded_context.strip().lower()
+        for ca in arch_artifact.architectures
     }
 
     # Check each bounded context has an architecture entry
-    bc_names = [c.name.strip() for c in bc_artifact.contexts]
+    bc_names = [c.name.strip() for c in bc_artifact.bounded_contexts]
     missing = [
         name for name in bc_names if name.strip().lower() not in arch_context_names
     ]

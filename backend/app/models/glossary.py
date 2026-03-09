@@ -1,124 +1,93 @@
 """
-Pydantic models for Glossary (Ubiquitous Language) artifact.
+Phase 1 — Ubiquitous Language (Glossary).
 
-Schema design principles:
-- Business-focused definitions (not technical jargon)
-- Capture relationships between terms
-- Flag ambiguities for human review
-- Support bounded context indicators
+Structured output model for extracting domain terms from requirements.
+Designed for OpenAI-compatible structured output (all fields required,
+Literal enums, ≤3 nesting levels).
 """
 
-from typing import Optional
+from __future__ import annotations
+
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class GlossaryTerm(BaseModel):
-    """A single domain term in the ubiquitous language glossary."""
+    """A single domain term in the ubiquitous language."""
 
-    term: str = Field(
-        ...,
-        description="The domain term or concept name (e.g., 'Order', 'Customer', 'Booking')"
+    name: str = Field(
+        description="The domain term exactly as used in the requirements",
     )
     definition: str = Field(
-        ...,
-        description="Clear business-focused definition of the term, as a domain expert would explain it"
+        description=(
+            "Clear, business-focused definition (not technical). "
+            "Written as a domain expert would explain it."
+        ),
+    )
+    category: Literal[
+        "entity",
+        "value_object",
+        "command",
+        "event",
+        "rule_policy",
+        "role",
+        "state",
+        "other",
+    ] = Field(
+        description="DDD classification of this term",
     )
     business_context: str = Field(
-        ...,
-        description="When and where this term is used in the business domain"
+        description="When and where this term is used in the business domain",
     )
     related_terms: list[str] = Field(
-        default_factory=list,
-        description="Other domain terms that are related to this term"
+        description="Other domain terms that are related to this term",
     )
-    category: Optional[str] = Field(
-        default=None,
-        description="Category: 'entity', 'value_object', 'command', 'event', 'policy', 'role', or 'state'"
+    is_ambiguous: bool = Field(
+        description=(
+            "Whether this term has multiple possible meanings "
+            "or needs clarification"
+        ),
     )
-    clarification_needed: Optional[str] = Field(
+    clarification_needed: str | None = Field(
         default=None,
-        description="Any ambiguities or questions that need domain expert clarification"
+        description=(
+            "Specific question or ambiguity about this term, "
+            "null if none"
+        ),
+    )
+    bounded_context_hint: str | None = Field(
+        default=None,
+        description=(
+            "Suggested bounded context this term might belong to, "
+            "null if unclear"
+        ),
     )
 
 
-class BoundedContextIndicator(BaseModel):
-    """Indicator of a potential bounded context based on term clustering."""
+class BoundedContextHint(BaseModel):
+    """Early indicator of a potential bounded context based on term groupings."""
 
     context_name: str = Field(
-        ...,
-        description="Suggested name for the bounded context (e.g., 'Sales', 'Inventory')"
+        description="Suggested name for this potential bounded context",
     )
-    related_terms: list[str] = Field(
-        ...,
-        description="Terms from the glossary that belong to this context"
+    term_names: list[str] = Field(
+        description="Names of glossary terms that belong to this context",
     )
-    rationale: str = Field(
-        ...,
-        description="Why these terms seem to form a cohesive bounded context"
+    reasoning: str = Field(
+        description="Why these terms are grouped together",
     )
 
 
 class GlossaryArtifact(BaseModel):
-    """
-    Complete Glossary artifact for the Ubiquitous Language phase.
-
-    This is the structured output schema for Phase 1 of the DDD workflow.
-    """
+    """Phase 1 artifact — the ubiquitous language glossary."""
 
     terms: list[GlossaryTerm] = Field(
-        ...,
-        description="List of all identified domain terms with their definitions"
+        description="All domain terms extracted from the requirements",
     )
-    bounded_context_indicators: list[BoundedContextIndicator] = Field(
-        default_factory=list,
-        description="Potential bounded contexts identified from term clustering"
+    bounded_context_hints: list[BoundedContextHint] = Field(
+        description=(
+            "Early indicators of potential bounded contexts "
+            "based on term groupings"
+        ),
     )
-    clarification_questions: list[str] = Field(
-        default_factory=list,
-        description="Questions to ask domain experts about ambiguous terms or concepts"
-    )
-
-    # Artifact metadata (populated by the system, not the LLM)
-    schema_version: str = Field(
-        default="1.0",
-        description="Version of this schema for future compatibility"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "terms": [
-                        {
-                            "term": "Room",
-                            "definition": "A physical space within a building that can be reserved for meetings or events",
-                            "business_context": "Central to the booking and reservation process",
-                            "related_terms": ["Booking", "Building", "Capacity"],
-                            "category": "entity",
-                            "clarification_needed": "Are virtual rooms also considered?"
-                        },
-                        {
-                            "term": "Booking",
-                            "definition": "A reservation of a room for a specific time period by a user",
-                            "business_context": "The core transaction in the room reservation system",
-                            "related_terms": ["Room", "User", "Time Slot"],
-                            "category": "entity",
-                            "clarification_needed": None
-                        }
-                    ],
-                    "bounded_context_indicators": [
-                        {
-                            "context_name": "Reservation Management",
-                            "related_terms": ["Booking", "Room", "Time Slot", "Cancellation"],
-                            "rationale": "These terms all relate to the core booking lifecycle"
-                        }
-                    ],
-                    "clarification_questions": [
-                        "Is there a difference between a 'Booking' and a 'Reservation'?",
-                        "Can a room belong to multiple buildings?"
-                    ],
-                    "schema_version": "1.0"
-                }
-            ]
-        }
-    }

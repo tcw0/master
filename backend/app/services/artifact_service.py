@@ -131,40 +131,33 @@ class ArtifactService:
         if schema == GlossaryArtifact:
             return schema.model_construct(
                 terms=[],
-                bounded_context_indicators=[],
-                clarification_questions=[f"[ERROR: {error}]"],
-                schema_version="1.0",
+                bounded_context_hints=[],
             )
         elif schema == EventStormingArtifact:
             return schema.model_construct(
-                actors=[],
                 commands=[],
                 domain_events=[],
                 policies=[],
-                aggregates_mentioned=[],
-                hot_spots=[],
-                schema_version="1.0",
+                flows=[],
+                ambiguities=[f"[ERROR: {error}]"],
             )
         elif schema == BoundedContextsArtifact:
             return schema.model_construct(
-                contexts=[],
-                relationships=[],
-                boundary_recommendations=[f"[ERROR: {error}]"],
-                schema_version="1.0",
+                bounded_contexts=[],
+                context_relationships=[],
+                term_overlaps=[],
             )
         elif schema == AggregatesArtifact:
             return schema.model_construct(
                 aggregates=[],
-                design_concerns=[f"[ERROR: {error}]"],
-                schema_version="1.0",
+                design_decisions=[f"[ERROR: {error}]"],
             )
         elif schema == ArchitectureArtifact:
             return schema.model_construct(
-                context_architectures=[],
+                architectures=[],
+                anti_corruption_layers=[],
+                published_interfaces=[],
                 technical_patterns=[],
-                integration_approach="[ERROR]",
-                infrastructure_concerns=[f"[ERROR: {error}]"],
-                schema_version="1.0",
             )
         else:
             raise ValueError(f"Unknown artifact type: {schema}")

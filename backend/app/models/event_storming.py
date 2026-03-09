@@ -1,311 +1,148 @@
 """
-Pydantic models for Event Storming artifact (Phase 2).
+Phase 2 — Event Storming.
 
-Schema design principles:
-- Capture events, commands, actors, policies as discrete records
-- Enable flow reconstruction via cross-references
-- Support Mermaid flowchart generation via explicit relationships
-- Flag ambiguities for human review
+Structured output model for identifying domain events, commands, actors,
+policies, and business process flows.
+
+Uses a dual structure:
+- Normalized lists (commands, events, policies) for cross-phase validation
+- Flow-oriented steps for direct 1:1 mapping to sticky-note visualization
+
+Designed for OpenAI-compatible structured output (all fields required,
+Literal enums, ≤3 nesting levels).
 """
 
-from typing import Optional, Literal
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 
-# Categories for visualization grouping
-EventCategory = Literal["domain_event", "integration_event", "system_event"]
-CommandCategory = Literal["user_command", "system_command", "policy_command"]
-ActorType = Literal["user", "external_system", "time", "policy"]
-
-
-class Actor(BaseModel):
-    """An actor or role that initiates commands in the system."""
+class Command(BaseModel):
+    """A command that can be issued by an actor to an aggregate."""
 
     name: str = Field(
-        ...,
-        description="Actor name (e.g., 'Guest', 'Admin', 'PaymentGateway', 'Scheduler')"
-    )
-    type: ActorType = Field(
-        ...,
-        description="Type of actor: user, external_system, time (scheduler), or policy"
+        description="Command name in imperative form (e.g., 'PlaceOrder')",
     )
     description: str = Field(
-        ...,
-        description="Role description and responsibilities"
+        description="What this command does in business terms",
+    )
+    actor: str = Field(
+        description="The actor or role who initiates this command",
+    )
+    target_aggregate: str = Field(
+        description="The aggregate that handles this command",
     )
 
 
 class DomainEvent(BaseModel):
-    """A domain event representing something significant that happened."""
+    """A domain event — something that happened in the domain (past tense)."""
 
     name: str = Field(
-        ...,
-        description="Event name in PastTense (e.g., 'RoomBooked', 'PaymentReceived')"
+        description="Domain event name in past tense (e.g., 'OrderPlaced')",
     )
     description: str = Field(
-        ...,
-        description="What this event represents in business terms"
+        description="What happened in business terms",
     )
-    category: EventCategory = Field(
-        default="domain_event",
-        description="Event category for grouping"
+    triggered_by_command: str = Field(
+        description="Name of the command that causes this event",
     )
     aggregate: str = Field(
-        ...,
-        description="The aggregate that emits this event"
-    )
-    triggered_by: str = Field(
-        ...,
-        description="Command name that causes this event"
-    )
-    payload: list[str] = Field(
-        default_factory=list,
-        description="Key data attributes carried by this event"
-    )
-    triggers_policies: list[str] = Field(
-        default_factory=list,
-        description="Policy names that react to this event"
-    )
-
-
-class Command(BaseModel):
-    """A command representing an intention to change system state."""
-
-    name: str = Field(
-        ...,
-        description="Command name in imperative form (e.g., 'BookRoom', 'CancelBooking')"
-    )
-    description: str = Field(
-        ...,
-        description="What this command intends to accomplish"
-    )
-    category: CommandCategory = Field(
-        default="user_command",
-        description="Command category for visualization"
-    )
-    actor: str = Field(
-        ...,
-        description="Actor name who initiates this command"
-    )
-    target_aggregate: str = Field(
-        ...,
-        description="Aggregate name that handles this command"
-    )
-    parameters: list[str] = Field(
-        default_factory=list,
-        description="Input parameters required (e.g., 'roomId', 'startTime')"
-    )
-    preconditions: list[str] = Field(
-        default_factory=list,
-        description="Conditions that must be true before execution"
-    )
-    produces_events: list[str] = Field(
-        default_factory=list,
-        description="Event names produced on successful execution"
+        description="The aggregate that emits this event",
     )
 
 
 class Policy(BaseModel):
-    """A policy/rule that reacts to events and may trigger commands."""
+    """A business policy or reaction rule triggered by a domain event."""
 
     name: str = Field(
-        ...,
-        description="Policy name (e.g., 'SendConfirmationOnBooking', 'EnforceMaxCapacity')"
+        description="Name of the business policy or reaction rule",
     )
     description: str = Field(
-        ...,
-        description="What this policy does and the business rule it enforces"
+        description="What this policy does in business terms",
     )
     triggered_by_event: str = Field(
-        ...,
-        description="Event name that activates this policy"
+        description="The domain event that activates this policy",
     )
-    condition: Optional[str] = Field(
-        None,
-        description="Condition under which the policy fires (if not always)"
+    resulting_command: str | None = Field(
+        default=None,
+        description="The command initiated by this policy, null if none",
     )
-    resulting_commands: list[str] = Field(
-        default_factory=list,
-        description="Command names triggered by this policy"
+
+
+class FlowStep(BaseModel):
+    """One sticky-note group in the event flow visualization.
+
+    Maps 1:1 to: Actor → Command → Aggregate → Event [→ Policy → Next Command]
+    """
+
+    actor: str = Field(
+        description="The actor or role performing the action",
     )
-    is_automated: bool = Field(
-        default=True,
-        description="Whether this policy executes automatically or requires human decision"
+    command: str = Field(
+        description="The command being executed",
+    )
+    aggregate: str = Field(
+        description="The aggregate handling the command",
+    )
+    event: str = Field(
+        description="The domain event emitted",
+    )
+    policy: str | None = Field(
+        default=None,
+        description="Policy triggered by this event, null if none",
+    )
+    next_command: str | None = Field(
+        default=None,
+        description=(
+            "Command initiated by the policy, null if flow "
+            "ends or no policy"
+        ),
     )
 
 
 class EventFlow(BaseModel):
-    """
-    A complete flow representing one user story or process path.
-    
-    Used primarily for visualization - captures a sequence for Mermaid generation.
-    """
+    """A business process represented as an ordered sequence of flow steps."""
 
     name: str = Field(
-        ...,
-        description="Flow name describing the scenario (e.g., 'Happy Path Booking')"
+        description=(
+            "Name of this business process or flow "
+            "(e.g., 'Order Fulfillment')"
+        ),
     )
     description: str = Field(
-        ...,
-        description="What this flow represents"
+        description="Brief description of this end-to-end process",
     )
-    steps: list[str] = Field(
-        ...,
-        description="Ordered list where EACH ELEMENT is a SEPARATE string. Example: ['Guest', 'BookRoom', 'Booking', 'RoomBooked', 'SendConfirmation']. Do NOT concatenate with arrows like 'A -> B -> C'."
-    )
-    is_happy_path: bool = Field(
-        default=True,
-        description="Whether this is the main success scenario"
-    )
-
-
-class HotSpot(BaseModel):
-    """
-    An area of uncertainty or contention identified during event storming.
-    
-    Hot spots are marked with 'pink stickies' in traditional event storming.
-    """
-
-    description: str = Field(
-        ...,
-        description="What is unclear or contentious"
-    )
-    related_elements: list[str] = Field(
-        default_factory=list,
-        description="Names of events, commands, or aggregates involved"
-    )
-    questions: list[str] = Field(
-        default_factory=list,
-        description="Specific questions to resolve this hot spot"
+    steps: list[FlowStep] = Field(
+        description=(
+            "Ordered sequence of flow steps, each representing "
+            "one sticky-note group in the event storming board"
+        ),
     )
 
 
 class EventStormingArtifact(BaseModel):
-    """
-    Complete Event Storming artifact for Phase 2 of the DDD workflow.
-    
-    Designed for:
-    - Machine-readable JSON storage
-    - Mermaid flowchart generation (via explicit relationships)
-    - Cross-phase validation (events -> aggregates -> bounded contexts)
-    """
+    """Phase 2 artifact — event storming results with dual structure."""
 
-    # Core elements (nodes in the visualization)
-    actors: list[Actor] = Field(
-        ...,
-        description="All identified actors/roles in the system"
-    )
+    # --- Normalized lists (for validation & cross-phase references) ---
     commands: list[Command] = Field(
-        ...,
-        description="All identified commands"
+        description="All unique commands identified from the requirements",
     )
     domain_events: list[DomainEvent] = Field(
-        ...,
-        description="All identified domain events"
+        description="All unique domain events identified from the requirements",
     )
     policies: list[Policy] = Field(
-        default_factory=list,
-        description="All identified policies/reactions"
+        description="All business policies and reactive rules",
     )
-
-    # Aggregates mentioned (will be fully designed in Phase 4)
-    aggregates_mentioned: list[str] = Field(
-        default_factory=list,
-        description="Aggregate names identified during event storming"
+    # --- Flow-oriented structure (for visualization) ---
+    flows: list[EventFlow] = Field(
+        description=(
+            "Business processes as ordered flow steps, "
+            "each step maps to a sticky-note group"
+        ),
     )
-
-    # Flows for visualization
-    event_flows: list[EventFlow] = Field(
-        default_factory=list,
-        description="Key flows showing complete scenarios"
+    ambiguities: list[str] = Field(
+        description=(
+            "Areas where the event flow is unclear or has "
+            "multiple interpretations"
+        ),
     )
-
-    # Temporal and process insights
-    temporal_boundaries: list[str] = Field(
-        default_factory=list,
-        description="Identified time-based boundaries (e.g., 'End of Day', 'Booking Window')"
-    )
-    parallel_processes: list[str] = Field(
-        default_factory=list,
-        description="Processes that can happen concurrently"
-    )
-
-    # Uncertainties
-    hot_spots: list[HotSpot] = Field(
-        default_factory=list,
-        description="Areas requiring clarification or domain expert input"
-    )
-
-    # Metadata
-    schema_version: str = Field(
-        default="1.0",
-        description="Schema version for compatibility"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "actors": [
-                        {
-                            "name": "Guest",
-                            "type": "user",
-                            "description": "A user who wants to book a room"
-                        }
-                    ],
-                    "commands": [
-                        {
-                            "name": "BookRoom",
-                            "description": "Reserve a room for a specific time slot",
-                            "category": "user_command",
-                            "actor": "Guest",
-                            "target_aggregate": "Booking",
-                            "parameters": ["roomId", "timeSlot", "guestId"],
-                            "preconditions": ["Room is available", "Guest is authenticated"],
-                            "produces_events": ["RoomBooked"]
-                        }
-                    ],
-                    "domain_events": [
-                        {
-                            "name": "RoomBooked",
-                            "description": "A room has been successfully reserved",
-                            "category": "domain_event",
-                            "aggregate": "Booking",
-                            "triggered_by": "BookRoom",
-                            "payload": ["bookingId", "roomId", "timeSlot", "guestId"],
-                            "triggers_policies": ["SendBookingConfirmation"]
-                        }
-                    ],
-                    "policies": [
-                        {
-                            "name": "SendBookingConfirmation",
-                            "description": "Send confirmation email when a booking is made",
-                            "triggered_by_event": "RoomBooked",
-                            "condition": None,
-                            "resulting_commands": ["SendEmail"],
-                            "is_automated": True
-                        }
-                    ],
-                    "aggregates_mentioned": ["Booking", "Room", "Guest"],
-                    "event_flows": [
-                        {
-                            "name": "Room Booking Happy Path",
-                            "description": "Guest successfully books an available room",
-                            "steps": ["Guest", "BookRoom", "Booking", "RoomBooked", "SendBookingConfirmation", "SendEmail"],
-                            "is_happy_path": True
-                        }
-                    ],
-                    "temporal_boundaries": ["Check-in time", "Cancellation deadline"],
-                    "parallel_processes": ["Payment processing", "Notification sending"],
-                    "hot_spots": [
-                        {
-                            "description": "What happens if payment fails after booking?",
-                            "related_elements": ["RoomBooked", "PaymentFailed"],
-                            "questions": ["Should we reserve the room before payment?", "How long to hold unpaid bookings?"]
-                        }
-                    ],
-                    "schema_version": "1.0"
-                }
-            ]
-        }
-    }

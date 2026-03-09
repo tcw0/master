@@ -1,49 +1,46 @@
-Task: Extract and Define Ubiquitous Language from Requirements
+Analyze the following requirements document and extract all domain terms to establish a ubiquitous language for Domain-Driven Design.
 
-Analyze the following requirements document and extract all domain terms to establish a clear ubiquitous language.
-
-## Requirements Document
+# Requirements
 
 {requirements}
 
-## Instructions
+# Instructions
 
-Follow this structured approach to build the Ubiquitous Language Glossary:
+Perform a thorough analysis of the requirements above. For every meaningful business concept, actor, action, event, rule, or state mentioned, create a glossary entry.
 
-### 1. Initial Analysis
-- Read through all requirements carefully
-- Identify every noun, verb, and business concept mentioned
-- Pay special attention to terms that appear multiple times or seem central to the domain
-- Note any terms that might have different meanings in different contexts
+## How to identify terms
 
-### 2. For Each Term, Capture:
-- **term**: The domain term or concept name (e.g., 'Order', 'Customer', 'Booking')
-- **definition**: Clear business-focused definition (not technical jargon)
-- **business_context**: When and where this term is used in the business domain
-- **related_terms**: Other domain terms that relate to this one
-- **category**: One of: 'entity', 'value_object', 'command', 'event', 'policy', 'role', 'state'
-- **clarification_needed**: Any ambiguities that need domain expert input (null if none)
+- Extract every noun, verb, and business concept that describes domain behavior
+- Pay special attention to terms that recur frequently or are central to business processes
+- Look for implicit concepts: terms not stated explicitly but implied by the requirements (e.g., if the requirements mention "booking expires after 24 hours", then "Expiration" or "Booking Expiration Policy" is an implicit concept)
+- Distinguish between truly different concepts vs. synonyms — if two words mean the same thing, pick the canonical term and note the synonym in related_terms
 
-### 3. Categories to Identify:
-- **Entities**: Things with identity that persist over time
-- **Value Objects**: Things defined by their attributes (immutable)
-- **Commands**: Actions users or systems perform
-- **Events**: Things that happen in the domain
-- **Policies**: Business constraints and invariants
-- **Roles**: Different actors in the system
-- **States**: Different conditions things can be in
+## How to classify each term
 
-### 4. Bounded Context Indicators
-Group related terms that might form bounded contexts. For each potential context:
-- Suggest a name
-- List related terms
-- Explain why these terms form a cohesive context
+Assign exactly one category per term:
+- "entity": things with a unique identity that persist over time (e.g., Customer, Order, Account)
+- "value_object": things defined entirely by their attributes, with no identity (e.g., Address, Money, DateRange)
+- "command": actions that users or systems perform (e.g., PlaceOrder, CancelReservation)
+- "event": things that happen as a result of commands (e.g., OrderPlaced, PaymentReceived)
+- "rule_policy": business constraints, invariants, or reactive rules (e.g., "Maximum 3 concurrent bookings per user")
+- "role": actors who interact with the system (e.g., Administrator, Guest, Reviewer)
+- "state": named conditions an entity can be in (e.g., Pending, Active, Expired)
+- "other": domain terms that do not fit the above categories
 
-### 5. Clarification Questions
-List questions for domain experts about:
-- Terms with ambiguous meanings
-- Terms that might have different meanings in different contexts
-- Missing definitions or unclear relationships
+## How to write definitions
 
-Focus on business-focused definitions that a domain expert would recognize and approve.
+- Write definitions as a domain expert would explain them to a colleague — precise, business-focused, no technical jargon
+- A good definition answers: "What is this thing and why does it matter in this domain?"
+- Avoid circular definitions (do not define "Order" as "an order that is placed")
 
+## Bounded context hints
+
+After extracting terms, look for natural groupings. Terms that are used together in the same business processes or that share a common purpose likely belong to the same bounded context. Provide your reasoning for each grouping.
+
+## Ambiguity detection
+
+Flag any term where:
+- The requirements use the same word with different meanings in different places
+- The definition is unclear or could be interpreted multiple ways
+- Important details are missing from the requirements
+For flagged terms, set is_ambiguous to true and write a specific clarification question in clarification_needed.

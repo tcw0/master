@@ -1,588 +1,188 @@
 """
-Pydantic models for Technical Architecture artifact (Phase 5).
+Phase 5 — Technical Architecture Mapping.
 
-Schema design principles:
-- Capture hexagonal architecture layers per bounded context
-- Model ACL and integration patterns explicitly
-- Support C4 and component diagram generation
-- Enable code scaffolding from architecture decisions
+Structured output model for mapping the domain model to a hexagonal
+architecture with domain, application, infrastructure, and presentation layers.
+
+Designed for OpenAI-compatible structured output (all fields required,
+Literal enums, ≤3 nesting levels).
 """
 
-from typing import Optional, Literal
+from __future__ import annotations
+
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
-# Layer types for hexagonal architecture
-LayerType = Literal["domain", "application", "infrastructure", "presentation"]
-
-# API types for published interfaces
-APIType = Literal["rest", "graphql", "grpc", "events", "websocket"]
-
-# Pattern names for technical decisions
-PatternName = Literal[
-    "repository",
-    "unit_of_work",
-    "specification",
-    "domain_events",
-    "cqrs",
-    "event_sourcing",
-    "saga",
-    "outbox",
-    "factory",
-    "domain_service",
-]
-
-
-class Component(BaseModel):
-    """A component within an architecture layer."""
+class DomainLayerElement(BaseModel):
+    """An element in the innermost domain layer."""
 
     name: str = Field(
-        ...,
-        description="Component name (e.g., 'BookingRepository', 'CreateBookingHandler')"
+        description="Name of the domain layer element",
     )
-    type: str = Field(
-        ...,
-        description="Component type (e.g., 'Repository', 'ApplicationService', 'Controller')"
+    element_type: Literal[
+        "entity",
+        "value_object",
+        "domain_service",
+        "repository_interface",
+        "domain_event",
+    ] = Field(
+        description="Type of domain layer element",
     )
     description: str = Field(
-        ...,
-        description="What this component does"
-    )
-    dependencies: list[str] = Field(
-        default_factory=list,
-        description="Other components this depends on"
+        description="Purpose and responsibility of this element",
     )
 
 
-class DomainLayer(BaseModel):
-    """
-    Domain layer - pure business logic, no infrastructure dependencies.
-    
-    Contains: Entities, Value Objects, Domain Services, Repository Interfaces, Domain Events
-    """
+class ApplicationLayerElement(BaseModel):
+    """An element in the application layer."""
 
-    aggregates: list[str] = Field(
-        ...,
-        description="Aggregate names implemented in this layer"
+    name: str = Field(
+        description="Name of the application layer element",
     )
-    entities: list[str] = Field(
-        default_factory=list,
-        description="Entity classes (including aggregate roots)"
+    element_type: Literal[
+        "application_service",
+        "dto",
+        "command",
+        "query",
+        "command_handler",
+        "query_handler",
+    ] = Field(
+        description="Type of application layer element",
     )
-    value_objects: list[str] = Field(
-        default_factory=list,
-        description="Value object classes"
-    )
-    domain_services: list[Component] = Field(
-        default_factory=list,
-        description="Domain services for cross-aggregate logic"
-    )
-    repository_interfaces: list[str] = Field(
-        default_factory=list,
-        description="Repository interface definitions (e.g., 'IBookingRepository')"
-    )
-    domain_events: list[str] = Field(
-        default_factory=list,
-        description="Domain event classes"
-    )
-    specifications: list[str] = Field(
-        default_factory=list,
-        description="Specification classes for complex queries"
+    description: str = Field(
+        description="Purpose and responsibility of this element",
     )
 
 
-class ApplicationLayer(BaseModel):
-    """
-    Application layer - use case orchestration, no business logic.
-    
-    Contains: Application Services, Command/Query Handlers, DTOs, Event Handlers
-    """
+class InfrastructureLayerElement(BaseModel):
+    """An element in the infrastructure layer."""
 
-    application_services: list[Component] = Field(
-        default_factory=list,
-        description="Application/use case service classes"
+    name: str = Field(
+        description="Name of the infrastructure layer element",
     )
-    command_handlers: list[Component] = Field(
-        default_factory=list,
-        description="Command handler classes (if using CQRS)"
+    element_type: Literal[
+        "repository_implementation",
+        "external_adapter",
+        "event_publisher",
+        "persistence_config",
+        "messaging",
+    ] = Field(
+        description="Type of infrastructure layer element",
     )
-    query_handlers: list[Component] = Field(
-        default_factory=list,
-        description="Query handler classes (if using CQRS)"
-    )
-    event_handlers: list[Component] = Field(
-        default_factory=list,
-        description="Domain event handler classes"
-    )
-    dtos: list[str] = Field(
-        default_factory=list,
-        description="Data transfer object classes"
-    )
-    commands: list[str] = Field(
-        default_factory=list,
-        description="Command classes (input DTOs for writes)"
-    )
-    queries: list[str] = Field(
-        default_factory=list,
-        description="Query classes (input DTOs for reads)"
+    description: str = Field(
+        description="Purpose and responsibility of this element",
     )
 
 
-class InfrastructureLayer(BaseModel):
-    """
-    Infrastructure layer - technical implementations.
-    
-    Contains: Repository Implementations, External Adapters, Persistence, Messaging
-    """
+class PresentationLayerElement(BaseModel):
+    """An element in the outermost presentation layer."""
 
-    repository_implementations: list[Component] = Field(
-        default_factory=list,
-        description="Repository implementation classes"
+    name: str = Field(
+        description="Name of the presentation layer element",
     )
-    persistence_models: list[str] = Field(
-        default_factory=list,
-        description="ORM/database model classes"
+    element_type: Literal[
+        "rest_controller",
+        "graphql_resolver",
+        "api_dto",
+        "middleware",
+    ] = Field(
+        description="Type of presentation layer element",
     )
-    external_service_adapters: list[Component] = Field(
-        default_factory=list,
-        description="Adapters for external services (e.g., 'SendGridEmailAdapter')"
-    )
-    messaging_adapters: list[Component] = Field(
-        default_factory=list,
-        description="Message queue/event bus adapters"
-    )
-    configuration: list[str] = Field(
-        default_factory=list,
-        description="Configuration and setup classes"
-    )
-
-
-class PresentationLayer(BaseModel):
-    """
-    Presentation layer - API and UI concerns.
-    
-    Contains: Controllers, GraphQL Resolvers, Request/Response Models
-    """
-
-    controllers: list[Component] = Field(
-        default_factory=list,
-        description="REST/API controllers"
-    )
-    graphql_resolvers: list[Component] = Field(
-        default_factory=list,
-        description="GraphQL resolvers (if applicable)"
-    )
-    request_models: list[str] = Field(
-        default_factory=list,
-        description="API request DTOs"
-    )
-    response_models: list[str] = Field(
-        default_factory=list,
-        description="API response DTOs"
-    )
-    middleware: list[str] = Field(
-        default_factory=list,
-        description="Middleware components (auth, logging, etc.)"
+    description: str = Field(
+        description="Purpose and responsibility of this element",
     )
 
 
 class HexagonalArchitecture(BaseModel):
-    """
-    Complete hexagonal (ports & adapters) architecture for a bounded context.
-    
-    Designed for component diagram generation and code scaffolding.
-    """
+    """Hexagonal architecture mapping for a single bounded context."""
 
-    domain_layer: DomainLayer = Field(
-        ...,
-        description="Core domain logic"
+    bounded_context: str = Field(
+        description="Name of the bounded context this architecture maps to",
     )
-    application_layer: ApplicationLayer = Field(
-        ...,
-        description="Use case orchestration"
+    domain_layer: list[DomainLayerElement] = Field(
+        description="Elements in the domain layer (innermost)",
     )
-    infrastructure_layer: InfrastructureLayer = Field(
-        ...,
-        description="Technical implementations"
+    application_layer: list[ApplicationLayerElement] = Field(
+        description="Elements in the application layer",
     )
-    presentation_layer: PresentationLayer = Field(
-        ...,
-        description="API/UI layer"
+    infrastructure_layer: list[InfrastructureLayerElement] = Field(
+        description="Elements in the infrastructure layer",
+    )
+    presentation_layer: list[PresentationLayerElement] = Field(
+        description="Elements in the presentation layer (outermost)",
     )
 
 
 class AntiCorruptionLayer(BaseModel):
-    """
-    Anti-Corruption Layer design between contexts.
-    
-    Protects the downstream context from upstream model pollution.
-    """
+    """Translation layer protecting a bounded context from a foreign model."""
 
-    name: str = Field(
-        ...,
-        description="ACL name (e.g., 'PaymentGatewayACL')"
+    owning_context: str = Field(
+        description="The bounded context that owns this ACL",
     )
-    source_context: str = Field(
-        ...,
-        description="External/upstream context name"
+    foreign_context: str = Field(
+        description="The external context being translated from",
     )
-    target_context: str = Field(
-        ...,
-        description="The context being protected"
+    translation_description: str = Field(
+        description="What the ACL translates and how",
     )
-    translator_services: list[Component] = Field(
-        ...,
-        description="Services that translate between models"
-    )
-    facade_interface: Optional[str] = Field(
-        None,
-        description="Simplified interface exposed to target context"
-    )
-    translated_concepts: list[str] = Field(
-        default_factory=list,
-        description="Concepts being translated (e.g., 'ExternalPayment -> DomainPayment')"
-    )
-    rationale: str = Field(
-        ...,
-        description="Why this ACL is needed"
+    translated_elements: list[str] = Field(
+        description="Domain elements that are translated through this ACL",
     )
 
 
 class PublishedInterface(BaseModel):
-    """
-    A published API or event interface from a bounded context.
-    
-    Documents what a context exposes to others.
-    """
+    """An interface published by a bounded context for external consumption."""
 
-    context_name: str = Field(
-        ...,
-        description="The context publishing this interface"
+    bounded_context: str = Field(
+        description="The bounded context publishing this interface",
     )
-    interface_type: APIType = Field(
-        ...,
-        description="Type of interface"
+    interface_type: Literal[
+        "rest_api",
+        "graphql_api",
+        "domain_events",
+        "shared_kernel",
+    ] = Field(
+        description="Type of published interface",
     )
-    name: str = Field(
-        ...,
-        description="Interface name (e.g., 'BookingAPI', 'ReservationEvents')"
+    description: str = Field(
+        description="What this interface exposes",
     )
-    endpoints: list[str] = Field(
-        default_factory=list,
-        description="API endpoints (e.g., 'POST /bookings', 'GET /rooms/{id}')"
-    )
-    events_published: list[str] = Field(
-        default_factory=list,
-        description="Events published (e.g., 'BookingConfirmed', 'RoomReleased')"
-    )
-    consumers: list[str] = Field(
-        default_factory=list,
-        description="Contexts or systems that consume this interface"
-    )
-    versioning_strategy: Optional[str] = Field(
-        None,
-        description="How this API is versioned"
+    exposed_operations: list[str] = Field(
+        description="List of operations or events exposed",
     )
 
 
 class TechnicalPattern(BaseModel):
-    """
-    A technical pattern applied in the architecture.
-    
-    Documents architectural decisions and their rationale.
-    """
+    """A technical pattern applied within a bounded context."""
 
-    pattern: PatternName = Field(
-        ...,
-        description="Pattern name"
+    pattern_name: str = Field(
+        description=(
+            "Name of the technical pattern "
+            "(e.g., 'Repository', 'Specification', 'Domain Events')"
+        ),
     )
-    applied_in: list[str] = Field(
-        ...,
-        description="Contexts or aggregates where this pattern is used"
+    applied_in_context: str = Field(
+        description="Bounded context where this pattern is applied",
     )
-    rationale: str = Field(
-        ...,
-        description="Why this pattern was chosen"
-    )
-    implementation_notes: Optional[str] = Field(
-        None,
-        description="Specific implementation guidance"
-    )
-
-
-class ContextArchitecture(BaseModel):
-    """
-    Complete architecture design for a single bounded context.
-    
-    Main unit for C4 container/component diagrams.
-    """
-
-    context_name: str = Field(
-        ...,
-        description="Name of the bounded context"
-    )
-    description: str = Field(
-        ...,
-        description="Brief description of this context's technical architecture"
-    )
-
-    # Hexagonal layers
-    layers: HexagonalArchitecture = Field(
-        ...,
-        description="Layer breakdown following hexagonal architecture"
-    )
-
-    # Integration
-    anti_corruption_layers: list[AntiCorruptionLayer] = Field(
-        default_factory=list,
-        description="ACLs protecting this context"
-    )
-    published_interfaces: list[PublishedInterface] = Field(
-        default_factory=list,
-        description="APIs/events this context publishes"
-    )
-    consumed_interfaces: list[str] = Field(
-        default_factory=list,
-        description="Interfaces from other contexts this consumes"
-    )
-
-    # Technical choices
-    persistence_technology: str = Field(
-        ...,
-        description="Database technology (e.g., 'PostgreSQL', 'MongoDB')"
-    )
-    messaging_technology: Optional[str] = Field(
-        None,
-        description="Message broker if used (e.g., 'RabbitMQ', 'Kafka')"
-    )
-
-
-class DeploymentUnit(BaseModel):
-    """
-    A deployment unit (service/container) grouping one or more bounded contexts.
-    """
-
-    name: str = Field(
-        ...,
-        description="Deployment unit/service name"
-    )
-    contexts_included: list[str] = Field(
-        ...,
-        description="Bounded contexts deployed together"
-    )
-    rationale: str = Field(
-        ...,
-        description="Why these contexts are deployed together"
-    )
-    scaling_considerations: Optional[str] = Field(
-        None,
-        description="Scaling and performance notes"
+    justification: str = Field(
+        description="How this pattern supports the domain model",
     )
 
 
 class ArchitectureArtifact(BaseModel):
-    """
-    Complete Technical Architecture artifact for Phase 5 of the DDD workflow.
-    
-    Designed for:
-    - Machine-readable JSON storage
-    - C4 system/container diagram generation
-    - Hexagonal architecture component diagrams
-    - Code scaffolding and project structure generation
-    """
+    """Phase 5 artifact — technical architecture mapping."""
 
-    # Per-context architecture
-    context_architectures: list[ContextArchitecture] = Field(
-        ...,
-        description="Architecture design for each bounded context"
+    architectures: list[HexagonalArchitecture] = Field(
+        description="Hexagonal architecture mapping per bounded context",
     )
-
-    # Cross-cutting patterns
+    anti_corruption_layers: list[AntiCorruptionLayer] = Field(
+        description="All anti-corruption layers between contexts",
+    )
+    published_interfaces: list[PublishedInterface] = Field(
+        description="Published APIs and events per context",
+    )
     technical_patterns: list[TechnicalPattern] = Field(
-        ...,
-        description="Technical patterns applied across the system"
+        description="Technical patterns applied and their justification",
     )
-
-    # Integration strategy
-    integration_approach: str = Field(
-        ...,
-        description="Overall integration strategy (e.g., 'Event-driven with REST for queries')"
-    )
-    event_bus_technology: Optional[str] = Field(
-        None,
-        description="Central event bus technology if used"
-    )
-    api_gateway: Optional[str] = Field(
-        None,
-        description="API gateway approach if used"
-    )
-
-    # Deployment
-    deployment_units: list[DeploymentUnit] = Field(
-        default_factory=list,
-        description="Suggested deployment units/services"
-    )
-    deployment_approach: Optional[str] = Field(
-        None,
-        description="Deployment strategy (e.g., 'Kubernetes microservices', 'Modular monolith')"
-    )
-
-    # Concerns and recommendations
-    infrastructure_concerns: list[str] = Field(
-        default_factory=list,
-        description="Technical concerns or risks"
-    )
-    recommendations: list[str] = Field(
-        default_factory=list,
-        description="Architecture recommendations"
-    )
-
-    # Metadata
-    schema_version: str = Field(
-        default="1.0",
-        description="Schema version for compatibility"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "context_architectures": [
-                        {
-                            "context_name": "Reservation",
-                            "description": "Handles room booking lifecycle",
-                            "layers": {
-                                "domain_layer": {
-                                    "aggregates": ["Booking", "Room"],
-                                    "entities": ["Booking", "Room"],
-                                    "value_objects": ["TimeSlot", "BookingId", "RoomId"],
-                                    "domain_services": [
-                                        {
-                                            "name": "AvailabilityChecker",
-                                            "type": "DomainService",
-                                            "description": "Checks room availability across bookings",
-                                            "dependencies": ["IBookingRepository", "IRoomRepository"]
-                                        }
-                                    ],
-                                    "repository_interfaces": ["IBookingRepository", "IRoomRepository"],
-                                    "domain_events": ["BookingCreated", "BookingConfirmed", "BookingCancelled"],
-                                    "specifications": ["AvailableRoomSpecification", "UpcomingBookingsSpecification"]
-                                },
-                                "application_layer": {
-                                    "application_services": [
-                                        {
-                                            "name": "BookingService",
-                                            "type": "ApplicationService",
-                                            "description": "Orchestrates booking use cases",
-                                            "dependencies": ["IBookingRepository", "AvailabilityChecker", "IEventPublisher"]
-                                        }
-                                    ],
-                                    "command_handlers": [],
-                                    "query_handlers": [],
-                                    "event_handlers": [
-                                        {
-                                            "name": "BookingConfirmedHandler",
-                                            "type": "EventHandler",
-                                            "description": "Handles BookingConfirmed event",
-                                            "dependencies": ["INotificationService"]
-                                        }
-                                    ],
-                                    "dtos": ["BookingDTO", "RoomDTO"],
-                                    "commands": ["CreateBookingCommand", "CancelBookingCommand"],
-                                    "queries": ["GetBookingQuery", "ListAvailableRoomsQuery"]
-                                },
-                                "infrastructure_layer": {
-                                    "repository_implementations": [
-                                        {
-                                            "name": "PostgresBookingRepository",
-                                            "type": "Repository",
-                                            "description": "PostgreSQL implementation of IBookingRepository",
-                                            "dependencies": ["DbContext"]
-                                        }
-                                    ],
-                                    "persistence_models": ["BookingEntity", "RoomEntity"],
-                                    "external_service_adapters": [],
-                                    "messaging_adapters": [
-                                        {
-                                            "name": "RabbitMQEventPublisher",
-                                            "type": "EventPublisher",
-                                            "description": "Publishes domain events to RabbitMQ",
-                                            "dependencies": ["IConnection"]
-                                        }
-                                    ],
-                                    "configuration": ["ReservationDbContext", "RepositoryRegistration"]
-                                },
-                                "presentation_layer": {
-                                    "controllers": [
-                                        {
-                                            "name": "BookingsController",
-                                            "type": "RESTController",
-                                            "description": "REST API for booking operations",
-                                            "dependencies": ["BookingService"]
-                                        }
-                                    ],
-                                    "graphql_resolvers": [],
-                                    "request_models": ["CreateBookingRequest", "CancelBookingRequest"],
-                                    "response_models": ["BookingResponse", "RoomResponse"],
-                                    "middleware": ["AuthenticationMiddleware", "ValidationMiddleware"]
-                                }
-                            },
-                            "anti_corruption_layers": [],
-                            "published_interfaces": [
-                                {
-                                    "context_name": "Reservation",
-                                    "interface_type": "rest",
-                                    "name": "BookingAPI",
-                                    "endpoints": ["POST /bookings", "GET /bookings/{id}", "DELETE /bookings/{id}"],
-                                    "events_published": [],
-                                    "consumers": ["Frontend"],
-                                    "versioning_strategy": "URL versioning (/v1/bookings)"
-                                },
-                                {
-                                    "context_name": "Reservation",
-                                    "interface_type": "events",
-                                    "name": "ReservationEvents",
-                                    "endpoints": [],
-                                    "events_published": ["BookingConfirmed", "BookingCancelled"],
-                                    "consumers": ["Notification", "Billing"],
-                                    "versioning_strategy": "Event schema versioning"
-                                }
-                            ],
-                            "consumed_interfaces": [],
-                            "persistence_technology": "PostgreSQL",
-                            "messaging_technology": "RabbitMQ"
-                        }
-                    ],
-                    "technical_patterns": [
-                        {
-                            "pattern": "repository",
-                            "applied_in": ["Reservation", "Notification"],
-                            "rationale": "Abstracts persistence for testability and flexibility",
-                            "implementation_notes": "Interface in domain, implementation in infrastructure"
-                        },
-                        {
-                            "pattern": "domain_events",
-                            "applied_in": ["Reservation"],
-                            "rationale": "Decouples bounded contexts via async messaging",
-                            "implementation_notes": "Publish after aggregate changes, use outbox pattern for reliability"
-                        }
-                    ],
-                    "integration_approach": "Event-driven for cross-context communication, REST for external API",
-                    "event_bus_technology": "RabbitMQ",
-                    "api_gateway": "Kong API Gateway",
-                    "deployment_units": [
-                        {
-                            "name": "reservation-service",
-                            "contexts_included": ["Reservation"],
-                            "rationale": "Core domain, independent scaling",
-                            "scaling_considerations": "Scale based on booking volume"
-                        }
-                    ],
-                    "deployment_approach": "Kubernetes microservices",
-                    "infrastructure_concerns": ["Event ordering not guaranteed with RabbitMQ"],
-                    "recommendations": ["Consider Kafka if strict ordering needed", "Add circuit breakers for external integrations"],
-                    "schema_version": "1.0"
-                }
-            ]
-        }
-    }

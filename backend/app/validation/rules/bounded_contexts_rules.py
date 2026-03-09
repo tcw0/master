@@ -30,7 +30,7 @@ def no_duplicate_context_names(artifacts: dict[str, BaseModel]) -> list[Validati
         return []
 
     results: list[ValidationResult] = []
-    context_names = [c.name.strip().lower() for c in bc_artifact.contexts]
+    context_names = [c.name.strip().lower() for c in bc_artifact.bounded_contexts]
     counts = Counter(context_names)
 
     duplicates = {name: count for name, count in counts.items() if count > 1}
