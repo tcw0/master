@@ -13,8 +13,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { ArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 
 import {
     getSession,
@@ -183,11 +183,7 @@ function PhaseCard({
                                     Artifact v{artifact.version} · {artifact.source}
                                 </p>
                             </div>
-                            <ScrollArea className="h-[400px] rounded-md border bg-muted/30 p-4">
-                                <pre className="text-xs font-mono whitespace-pre-wrap break-words">
-                                    {JSON.stringify(artifact.artifact, null, 2)}
-                                </pre>
-                            </ScrollArea>
+                            <ArtifactViewer phaseId={phase.phase_id} artifact={artifact.artifact} />
                         </div>
                     ) : phase.status === "failed" ? (
                         <p className="text-sm text-destructive">Phase failed. Click Run to retry.</p>

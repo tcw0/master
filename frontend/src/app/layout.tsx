@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,10 +30,12 @@ export default function RootLayout({
             </a>
           </div>
         </header>
-        <main className="mx-auto max-w-5xl px-6 py-8">
-          {children}
-        </main>
-        <Toaster />
+        <TooltipProvider>
+          <main className="mx-auto max-w-5xl px-6 py-8">
+            {children}
+          </main>
+          <Toaster />
+        </TooltipProvider>
       </body>
     </html>
   );
