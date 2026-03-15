@@ -1,282 +1,154 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { toast } from "sonner";
-
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { getSession, type Session } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { ArtifactViewer } from "@/components/artifacts/ArtifactViewer";
+import { CheckCircle2, Circle, Loader2, AlertCircle, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useParams, useRouter } from "next/navigation";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-import {
-    getSession,
-    runPhase,
-    getArtifact,
-    type Session,
-    type PhaseStatus,
-    type ArtifactResponse,
-} from "@/lib/api";
-
-// =============================================================================
-// Status helpers
-// =============================================================================
-
-function statusBadge(status: string) {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-        completed: "default",
-        running: "secondary",
-        failed: "destructive",
-        pending: "outline",
-    };
-    return (
-        <Badge variant={variants[status] || "outline"} className="capitalize">
-            {status}
-        </Badge>
-    );
-}
-
-function sourceBadge(source: string | null, version: number | null) {
-    if (!source || !version) return null;
-    return (
-        <span className="text-xs text-muted-foreground">
-            v{version} · {source}
-        </span>
-    );
-}
-
-// =============================================================================
-// Phase Card
-// =============================================================================
-
-function PhaseCard({
-    phase,
-    sessionId,
-    isRunnable,
-    onPhaseComplete,
-}: {
-    phase: PhaseStatus;
-    sessionId: string;
-    isRunnable: boolean;
-    onPhaseComplete: () => void;
-}) {
-    const [running, setRunning] = useState(false);
-    const [expanded, setExpanded] = useState(false);
-    const [artifact, setArtifact] = useState<ArtifactResponse | null>(null);
-    const [loadingArtifact, setLoadingArtifact] = useState(false);
-
-    const loadArtifact = useCallback(async () => {
-        if (!phase.has_artifact) return;
-        setLoadingArtifact(true);
-        try {
-            const data = await getArtifact(sessionId, phase.phase_id);
-            setArtifact(data);
-        } catch {
-            toast.error("Failed to load artifact");
-        } finally {
-            setLoadingArtifact(false);
-        }
-    }, [sessionId, phase.phase_id, phase.has_artifact]);
-
-    async function handleRun() {
-        setRunning(true);
-        try {
-            const result = await runPhase(sessionId, phase.phase_id);
-            if (result.status === "completed") {
-                toast.success(`${phase.phase_name} completed`);
-                setArtifact({
-                    phase_id: result.phase_id,
-                    phase_name: result.phase_name,
-                    version: result.version,
-                    source: result.source,
-                    artifact: result.artifact!,
-                });
-                setExpanded(true);
-            } else {
-                toast.error(`${phase.phase_name} failed: ${result.error}`);
-            }
-            onPhaseComplete();
-        } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Phase execution failed");
-        } finally {
-            setRunning(false);
-        }
+function StatusIcon({ status }: { status: string }) {
+    switch (status) {
+        case "completed":
+            return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        case "running":
+            return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />;
+        case "failed":
+            return <AlertCircle className="h-5 w-5 text-destructive" />;
+        default:
+            return <Circle className="h-5 w-5 text-muted-foreground/50" />;
     }
-
-    function handleToggle() {
-        if (!expanded && phase.has_artifact && !artifact) {
-            loadArtifact();
-        }
-        setExpanded(!expanded);
-    }
-
-    return (
-        <Card
-            className={
-                phase.status === "completed"
-                    ? "border-green-800/40"
-                    : phase.status === "failed"
-                        ? "border-red-800/40"
-                        : ""
-            }
-        >
-            <CardHeader
-                className="cursor-pointer"
-                onClick={handleToggle}
-            >
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-sm font-medium">
-                            {phase.phase_number}
-                        </span>
-                        <div>
-                            <CardTitle className="text-base">{phase.phase_name}</CardTitle>
-                            <div className="flex items-center gap-2 mt-1">
-                                {statusBadge(phase.status)}
-                                {sourceBadge(phase.source, phase.version)}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {isRunnable && phase.status !== "running" && (
-                            <Button
-                                size="sm"
-                                variant={phase.status === "completed" ? "outline" : "default"}
-                                disabled={running}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRun();
-                                }}
-                            >
-                                {running
-                                    ? "Running..."
-                                    : phase.status === "completed"
-                                        ? "Re-run"
-                                        : "Run"}
-                            </Button>
-                        )}
-                        {phase.has_artifact && (
-                            <span className="text-xs text-muted-foreground">
-                                {expanded ? "▲" : "▼"}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </CardHeader>
-
-            {expanded && (
-                <CardContent>
-                    <Separator className="mb-4" />
-                    {loadingArtifact ? (
-                        <p className="text-sm text-muted-foreground">Loading artifact...</p>
-                    ) : artifact ? (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-muted-foreground">
-                                    Artifact v{artifact.version} · {artifact.source}
-                                </p>
-                            </div>
-                            <ArtifactViewer phaseId={phase.phase_id} artifact={artifact.artifact} />
-                        </div>
-                    ) : phase.status === "failed" ? (
-                        <p className="text-sm text-destructive">Phase failed. Click Run to retry.</p>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            No artifact yet. Run this phase to generate one.
-                        </p>
-                    )}
-                </CardContent>
-            )}
-        </Card>
-    );
 }
 
-// =============================================================================
-// Session Page
-// =============================================================================
-
-export default function SessionPage() {
+export default function SessionOverviewPage() {
     const params = useParams<{ id: string }>();
     const [session, setSession] = useState<Session | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    const loadSession = useCallback(async () => {
-        try {
-            const data = await getSession(params.id);
-            setSession(data);
-        } catch {
-            toast.error("Failed to load session");
-        } finally {
-            setLoading(false);
-        }
-    }, [params.id]);
+    const router = useRouter();
 
     useEffect(() => {
-        loadSession();
-    }, [loadSession]);
-
-    if (loading) {
-        return <p className="text-muted-foreground">Loading session...</p>;
-    }
+        getSession(params.id).then(setSession).catch(console.error);
+    }, [params.id]);
 
     if (!session) {
-        return <p className="text-destructive">Session not found.</p>;
+        return <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/3"></div>
+            <div className="h-40 bg-muted/50 rounded w-full"></div>
+        </div>;
     }
 
-    // A phase is runnable if all its prerequisites are met
-    function isPhaseRunnable(phase: PhaseStatus): boolean {
-        if (!session) return false;
-        // Phase 1 is always runnable
-        if (phase.phase_number === 1) return true;
-        // All previous phases must be completed
-        for (const p of session.phases) {
-            if (p.phase_number < phase.phase_number && p.status !== "completed") {
-                return false;
-            }
-        }
-        return true;
-    }
+    const completedCount = session.phases.filter(p => p.status === "completed").length;
+    const progressPercent = Math.round((completedCount / session.phases.length) * 100);
 
-    const completed = session.phases.filter((p) => p.status === "completed").length;
+    // Find the first non-completed phase to direct the user to
+    const nextPhase = session.phases.find(p => p.status !== "completed") || session.phases[session.phases.length - 1];
 
     return (
-        <div className="space-y-6">
-            {/* Session Header */}
+        <div className="space-y-8 max-w-4xl">
+            {/* Header */}
             <div>
-                <div className="flex items-center gap-3">
-                    <a href="/" className="text-muted-foreground hover:text-foreground text-sm">
-                        ← Sessions
-                    </a>
-                </div>
-                <h1 className="mt-2 text-2xl font-bold">{session.requirements_name}</h1>
-                <p className="text-sm text-muted-foreground">
-                    {session.provider}/{session.model} · T={session.temperature} ·{" "}
-                    {completed}/5 phases complete ·{" "}
-                    <span className="font-mono">{session.id}</span>
+                <h1 className="text-3xl font-bold tracking-tight mb-2">Session Overview</h1>
+                <p className="text-muted-foreground">
+                    Review your overall progress and the initial requirements for this Domain-Driven Design session.
                 </p>
             </div>
 
-            <Separator />
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* Stats Card */}
+                <Card>
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-lg">Progress</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="w-16 h-16 rounded-full border-4 border-muted flex items-center justify-center font-bold text-xl relative">
+                                <span className="absolute inset-0 rounded-full border-4 border-primary" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${progressPercent}%, 0 ${progressPercent}%)` }}></span>
+                                {completedCount}/5
+                            </div>
+                            <div>
+                                <p className="font-medium">{progressPercent}% Completed</p>
+                                <p className="text-sm text-muted-foreground">All phases must be completed sequentially.</p>
+                            </div>
+                        </div>
 
-            {/* Pipeline Phases */}
-            <div className="space-y-3">
-                {session.phases.map((phase) => (
-                    <PhaseCard
-                        key={phase.phase_id}
-                        phase={phase}
-                        sessionId={session.id}
-                        isRunnable={isPhaseRunnable(phase)}
-                        onPhaseComplete={loadSession}
-                    />
-                ))}
+                        <div className="space-y-2">
+                            {session.phases.map(p => (
+                                <div key={p.phase_id} className="flex items-center gap-3 text-sm">
+                                    <StatusIcon status={p.status} />
+                                    <span className={p.status === "completed" ? "text-foreground" : "text-muted-foreground"}>
+                                        Phase {p.phase_number}: {p.phase_name}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-6">
+                            <Button 
+                                className="w-full group" 
+                                onClick={() => router.push(`/sessions/${session.id}/phases/${nextPhase.phase_id}`)}
+                            >
+                                {completedCount === 0 ? "Start Pipeline" : completedCount === 5 ? "Review Architecture" : `Continue to Phase ${nextPhase.phase_number}`}
+                                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Meta Card */}
+                <Card>
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-lg">Environment</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 text-sm">
+                        <div className="grid grid-cols-3 gap-1">
+                            <span className="text-muted-foreground">Session ID</span>
+                            <span className="col-span-2 font-mono text-xs break-all">{session.id}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                            <span className="text-muted-foreground">Created</span>
+                            <span className="col-span-2">{new Date(session.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 items-center">
+                            <span className="text-muted-foreground">Provider</span>
+                            <div className="col-span-2">
+                                <Badge variant="secondary" className="capitalize">{session.provider}</Badge>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 items-center">
+                            <span className="text-muted-foreground">Model</span>
+                            <div className="col-span-2">
+                                <Badge variant="outline">{session.model}</Badge>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                            <span className="text-muted-foreground">Temperature</span>
+                            <span className="col-span-2">{session.temperature}</span>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
+
+            {/* Input Context */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Business Requirements Context</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-64 rounded-md border bg-muted/20 p-4">
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <p className="whitespace-pre-wrap font-serif text-muted-foreground/90">
+                                {/* The backend doesn't currently return the raw requirements text in the Session model, 
+                                    so we just show the name. If the backend is updated to return it, we can display it here. */}
+                                {session.requirements_name}
+                            </p>
+                        </div>
+                    </ScrollArea>
+                    <p className="text-xs text-muted-foreground mt-3 italic">
+                        This text serves as the grounding context for all LLM generations in this session.
+                    </p>
+                </CardContent>
+            </Card>
         </div>
     );
 }
