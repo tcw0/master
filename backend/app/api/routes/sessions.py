@@ -64,6 +64,7 @@ def _session_to_response(
 
     return SessionResponse(
         id=str(session.id),
+        requirements_text=session.requirements_text,
         requirements_name=session.requirements_name,
         provider=session.provider,
         model=session.model,

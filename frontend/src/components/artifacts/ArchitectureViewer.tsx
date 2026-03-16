@@ -173,7 +173,17 @@ export function ArchitectureViewer({ data }: { data: ArchitectureArtifact }) {
             ))}
           </TabsList>
           {data.architectures.map((arch) => (
-            <TabsContent key={arch.bounded_context} value={arch.bounded_context} className="mt-4">
+            <TabsContent key={arch.bounded_context} value={arch.bounded_context} className="mt-4 space-y-4">
+              
+              {/* Legend */}
+              <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-md border text-xs">
+                <span className="font-semibold flex items-center">Legend (Layers):</span>
+                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-sky-500/10 rounded-sm border border-sky-500/30"></div> Presentation</span>
+                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500/10 rounded-sm border border-emerald-500/30"></div> Infrastructure</span>
+                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-500/10 rounded-sm border border-amber-500/30"></div> Application</span>
+                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-500/10 rounded-sm border border-indigo-500/30"></div> Domain</span>
+              </div>
+
               <HexagonalView arch={arch} />
             </TabsContent>
           ))}
@@ -254,11 +264,11 @@ export function ArchitectureViewer({ data }: { data: ArchitectureArtifact }) {
               <TableBody>
                 {data.technical_patterns.map((tp, i) => (
                   <TableRow key={i}>
-                    <TableCell className="font-medium text-sm">{tp.pattern_name}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium text-sm max-w-[200px] truncate" title={tp.pattern_name}>{tp.pattern_name}</TableCell>
+                    <TableCell className="max-w-[150px] truncate" title={tp.applied_in_context}>
                       <Badge variant="outline" className="text-xs">{tp.applied_in_context}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{tp.justification}</TableCell>
+                    <TableCell className="text-sm max-w-[400px] break-words whitespace-pre-wrap">{tp.justification}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

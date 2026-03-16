@@ -203,6 +203,21 @@ export function AggregatesViewer({ data }: { data: AggregatesArtifact }) {
         <span>{grouped.size} bounded contexts</span>
       </div>
 
+      {/* Legend */}
+      <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-md border text-xs">
+        <span className="font-semibold flex items-center">Legend:</span>
+        <div className="flex items-center gap-2 border-r pr-4 border-border">
+          <span className="flex items-center gap-1"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-blue-500/15 text-blue-400 border-blue-500/30">E</Badge> Entity</span>
+          <span className="flex items-center gap-1"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-teal-500/15 text-teal-400 border-teal-500/30">VO</Badge> Value Object</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground mr-1">Evaluation:</span>
+          <span className="flex items-center"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-green-500/15 text-green-400 border-green-500/30">small</Badge></span>
+          <span className="flex items-center"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-yellow-500/15 text-yellow-400 border-yellow-500/30">moderate</Badge></span>
+          <span className="flex items-center"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-red-500/15 text-red-400 border-red-500/30">large</Badge></span>
+        </div>
+      </div>
+
       {/* Grouped aggregates */}
       {Array.from(grouped.entries()).map(([context, aggregates]) => (
         <div key={context} className="space-y-3">

@@ -49,9 +49,6 @@ export default function SessionOverviewPage() {
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold tracking-tight mb-2">Session Overview</h1>
-                <p className="text-muted-foreground">
-                    Review your overall progress and the initial requirements for this Domain-Driven Design session.
-                </p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -68,7 +65,6 @@ export default function SessionOverviewPage() {
                             </div>
                             <div>
                                 <p className="font-medium">{progressPercent}% Completed</p>
-                                <p className="text-sm text-muted-foreground">All phases must be completed sequentially.</p>
                             </div>
                         </div>
 
@@ -84,8 +80,8 @@ export default function SessionOverviewPage() {
                         </div>
 
                         <div className="mt-6">
-                            <Button 
-                                className="w-full group" 
+                            <Button
+                                className="w-full group"
                                 onClick={() => router.push(`/sessions/${session.id}/phases/${nextPhase.phase_id}`)}
                             >
                                 {completedCount === 0 ? "Start Pipeline" : completedCount === 5 ? "Review Architecture" : `Continue to Phase ${nextPhase.phase_number}`}
@@ -138,15 +134,10 @@ export default function SessionOverviewPage() {
                     <ScrollArea className="h-64 rounded-md border bg-muted/20 p-4">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                             <p className="whitespace-pre-wrap font-serif text-muted-foreground/90">
-                                {/* The backend doesn't currently return the raw requirements text in the Session model, 
-                                    so we just show the name. If the backend is updated to return it, we can display it here. */}
-                                {session.requirements_name}
+                                {session.requirements_text}
                             </p>
                         </div>
                     </ScrollArea>
-                    <p className="text-xs text-muted-foreground mt-3 italic">
-                        This text serves as the grounding context for all LLM generations in this session.
-                    </p>
                 </CardContent>
             </Card>
         </div>

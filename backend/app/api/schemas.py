@@ -54,6 +54,7 @@ class PhaseResponse(BaseModel):
 class SessionResponse(BaseModel):
     """Response for a pipeline session."""
     id: str
+    requirements_text: str
     requirements_name: str
     provider: str
     model: str

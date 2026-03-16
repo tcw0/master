@@ -107,13 +107,27 @@ export function EventStormingViewer({ data }: { data: EventStormingArtifact }) {
 
         {/* Flows tab — Mermaid diagrams */}
         <TabsContent value="flows" className="space-y-6 mt-4">
+          
+          {/* Legend */}
+          <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-md border text-xs">
+            <span className="font-semibold mr-2 flex items-center">Legend:</span>
+            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500 rounded-sm border border-yellow-700"></div> Actor</span>
+            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-sm border border-blue-700"></div> Command</span>
+            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-500 rounded-sm border border-amber-700"></div> Aggregate</span>
+            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-500 rounded-sm border border-orange-700"></div> Domain Event</span>
+            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-500 rounded-sm border border-purple-700"></div> Policy</span>
+            <span className="flex items-center gap-1 ml-2 text-muted-foreground">- - -{">"} triggers</span>
+          </div>
+
           {flowDiagrams.map(({ flow, mermaid }) => (
             <div key={flow.name} className="space-y-2">
               <div>
                 <h4 className="text-sm font-semibold">{flow.name}</h4>
                 <p className="text-xs text-muted-foreground">{flow.description}</p>
               </div>
-              <MermaidDiagram definition={mermaid} />
+              <div className="border rounded-md p-4 bg-background">
+                <MermaidDiagram definition={mermaid} />
+              </div>
             </div>
           ))}
           {flowDiagrams.length === 0 && (

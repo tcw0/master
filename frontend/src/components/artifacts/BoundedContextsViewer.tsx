@@ -124,7 +124,20 @@ export function BoundedContextsViewer({ data }: { data: BoundedContextsArtifact 
 
         {/* Context Map — Mermaid */}
         <TabsContent value="map" className="mt-4 space-y-4">
-          <MermaidDiagram definition={mermaidDef} />
+          
+          {/* Legend */}
+          <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-md border text-xs">
+            <span className="font-semibold flex items-center">Legend:</span>
+            <div className="flex items-center gap-2 border-r pr-4">
+              <span className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-500 rounded-sm border border-indigo-700"></div> Core</span>
+              <span className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-500 rounded-sm border border-amber-700"></div> Supporting</span>
+              <span className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-500 rounded-sm border border-gray-700"></div> Generic</span>
+            </div>
+          </div>
+
+          <div className="border rounded-md p-4 bg-background">
+            <MermaidDiagram definition={mermaidDef} />
+          </div>
 
           {/* Relationship table */}
           {data.context_relationships.length > 0 && (
@@ -150,7 +163,7 @@ export function BoundedContextsViewer({ data }: { data: BoundedContextsArtifact 
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">{rel.target_context}</TableCell>
-                        <TableCell className="text-sm">{rel.description}</TableCell>
+                        <TableCell className="text-sm max-w-[400px] break-words whitespace-pre-wrap">{rel.description}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

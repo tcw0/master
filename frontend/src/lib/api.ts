@@ -23,6 +23,7 @@ export interface PhaseStatus {
 
 export interface Session {
     id: string;
+    requirements_text: string;
     requirements_name: string;
     provider: string;
     model: string;

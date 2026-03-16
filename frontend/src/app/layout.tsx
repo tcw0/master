@@ -31,7 +31,7 @@ export default function RootLayout({
           </div>
         </header>
         <TooltipProvider>
-          <main className="mx-auto max-w-5xl px-6 py-8">
+          <main className="mx-auto max-w-7xl px-6 py-8">
             {children}
           </main>
           <Toaster />

@@ -155,7 +155,7 @@ export function GlossaryViewer({ data }: { data: GlossaryArtifact }) {
                     {CATEGORY_LABELS[term.category]}
                   </Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell className="max-w-[400px] break-words whitespace-pre-wrap">
                   <p className="text-sm">{term.definition}</p>
                   {term.business_context && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -163,7 +163,7 @@ export function GlossaryViewer({ data }: { data: GlossaryArtifact }) {
                     </p>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className="max-w-[200px]">
                   <div className="flex flex-wrap gap-1">
                     {term.related_terms.map((rt) => (
                       <Badge key={rt} variant="outline" className="text-xs">
