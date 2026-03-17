@@ -14,21 +14,30 @@ export default function Phase4Page() {
             description={
                 <div className="space-y-4">
                     <p>
-                        Aggregates define transactional consistency boundaries — the smallest unit within which business rules 
+                        Aggregates define transactional consistency boundaries. The smallest unit within which business rules 
                         (invariants) are guaranteed to hold synchronously.
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                        <div className="bg-muted/30 p-4 rounded-md border space-y-2">
+                    <div className="flex flex-col gap-4 mt-2">
+                        <div className="bg-muted/30 p-4 rounded-md border space-y-3">
                             <h3 className="font-semibold text-foreground flex items-center gap-2">
                                 Visualization Explanation
                             </h3>
-                            <p className="text-sm text-muted-foreground">A breakdown of root entities and their child components grouped by bounded context. It specifies their invariants, properties, and explicit transaction sizing.</p>
+                            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-4 marker:text-muted-foreground/50">
+                                <li><strong className="text-foreground">Aggregate Cards:</strong> Grouped by context, each card represents a transactional boundary encompassing a root entity and its children.</li>
+                                <li><strong className="text-foreground">Evaluation Badges:</strong> Visual indicators ranking aggregate size and complexity.</li>
+                                <li><strong className="text-foreground">Elements:</strong> The internal structural breakdown showing the Root Entity and attached Value Objects.</li>
+                                <li><strong className="text-foreground">Invariants:</strong> The strict business rules that must be satisfied before this aggregate can be persisted to the database.</li>
+                                <li><strong className="text-foreground">Commands & Events:</strong> The specific actions this aggregate can accept, and the resulting events it emits upon success.</li>
+                            </ul>
                         </div>
-                        <div className="bg-muted/30 p-4 rounded-md border space-y-2">
+                        <div className="bg-muted/30 p-4 rounded-md border space-y-3">
                             <h3 className="font-semibold text-foreground flex items-center gap-2">
                                 Usage Guide
                             </h3>
-                            <p className="text-sm text-muted-foreground">Focus on the <strong className="text-amber-500 font-medium">Evaluation</strong> badges. An aggregate marked as <em>large</em> or <em>monolithic</em> is a red flag for database contention and sluggish writes. Review its child entities where necessary.</p>
+                            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-4 marker:text-muted-foreground/50">
+                                <li><strong className="text-foreground">Prevent Contention:</strong> Be aware of aggregates marked as <em>large</em> and <em>monolithic</em>.</li>
+                                <li><strong className="text-foreground">Review Design Decisions:</strong> Read the architectural reasoning at the page bottom to understand why specific boundaries were chosen.</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
