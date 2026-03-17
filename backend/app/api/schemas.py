@@ -85,6 +85,19 @@ class RunPhaseRequest(BaseModel):
     )
 
 
+class RefinePhaseRequest(BaseModel):
+    """Request body for refining an artifact via human instructions."""
+    instructions: str = Field(
+        ..., description="Natural language instructions for refining the artifact",
+    )
+    max_retries: int = Field(
+        default=2,
+        description="Maximum retries on failure",
+        ge=0,
+        le=5,
+    )
+
+
 class RunPhaseResponse(BaseModel):
     """Response after executing a pipeline phase."""
     phase_id: str

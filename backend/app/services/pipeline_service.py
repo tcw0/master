@@ -166,9 +166,11 @@ class PipelineService:
         phase: PhaseConfig,
         state: WorkflowState,
         max_retries: int = 2,
+        instructions: str | None = None,
+        current_artifact: dict | None = None,
     ) -> tuple[BaseModel | None, str | None, ValidationReport | None]:
         """
-        Execute a single phase with retry logic.
+        Execute a single phase with retry logic, optionally refining an existing one.
 
         Two-stage validation per attempt:
         1. Structural: LLM output must parse into the expected Pydantic schema.
@@ -179,14 +181,20 @@ class PipelineService:
             phase: Phase configuration.
             state: Workflow state with existing artifacts.
             max_retries: Maximum retry attempts.
+            instructions: Optional human instructions for refinement.
+            current_artifact: The existing artifact to refine (required if instructions provided).
 
         Returns:
             Tuple of (artifact, raw_response, validation_report).
             On failure: (None, error_message, None).
         """
-        logger.info(f"--- Phase {phase.phase_number}: {phase.name} ---")
+        logger.info(f"--- Phase {phase.phase_number}: {phase.name} {'(Refinement)' if instructions else ''} ---")
 
-        chain = self._build_structured_chain(phase, state, include_raw=True)
+        chain = self._build_structured_chain(
+            phase, state, include_raw=True,
+            instructions=instructions,
+            current_artifact=current_artifact,
+        )
 
         last_error = None
         raw_response = None
@@ -274,11 +282,16 @@ class PipelineService:
 
         return build_context
 
-    def _build_prompt(self, phase: PhaseConfig) -> ChatPromptTemplate:
+    def _build_prompt(
+        self,
+        phase: PhaseConfig,
+        has_refinement: bool = False,
+    ) -> ChatPromptTemplate:
         """
         Build a ChatPromptTemplate for a phase.
 
         Uses system + human message format for better LLM guidance.
+        Appends a refinement block if user instructions are provided.
         """
         template_path = PROMPTS_DIR / phase.prompt_file
         task_template = _read_file(template_path)
@@ -292,6 +305,20 @@ class PipelineService:
             HumanMessagePromptTemplate.from_template(task_template),
         )
 
+        if has_refinement:
+            refinement_template = (
+                "You previously generated the following artifact:\n"
+                "```json\n"
+                "{current_artifact}\n"
+                "```\n\n"
+                "The user has reviewed it and provided the following instructions for refinement:\n"
+                "{instructions}\n\n"
+                "Please generate a new, updated version of the artifact that incorporates these instructions while maintaining all other valid information."
+            )
+            messages.append(
+                HumanMessagePromptTemplate.from_template(refinement_template)
+            )
+
         return ChatPromptTemplate.from_messages(messages)
 
     def _build_structured_chain(
@@ -299,6 +326,8 @@ class PipelineService:
         phase: PhaseConfig,
         state: WorkflowState,
         include_raw: bool = True,
+        instructions: str | None = None,
+        current_artifact: dict | None = None,
     ) -> RunnableSerializable:
         """
         Build an LCEL chain with structured output enforcement.
@@ -309,8 +338,16 @@ class PipelineService:
         3. Prompt template (formats the messages)
         4. Structured LLM (enforces schema output via selected method)
         """
-        prompt = self._build_prompt(phase)
-        context_builder = self._build_context_builder(phase, state)
+        prompt = self._build_prompt(phase, has_refinement=bool(instructions))
+        base_context_builder = self._build_context_builder(phase, state)
+
+        def context_builder(_: Any) -> dict[str, str]:
+            ctx = base_context_builder(None)
+            if instructions and current_artifact:
+                import json
+                ctx["instructions"] = instructions
+                ctx["current_artifact"] = json.dumps(current_artifact, indent=2)
+            return ctx
 
         structured_llm = self.llm_service.llm.with_structured_output(
             phase.output_schema,

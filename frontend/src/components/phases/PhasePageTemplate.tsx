@@ -1,9 +1,20 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Circle, Play, RotateCw } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, CheckCircle2, Circle, Play, RotateCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { ArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 import { usePhase } from "@/hooks/use-phase";
 
@@ -33,7 +44,19 @@ export function PhasePageTemplate({
     title,
     description,
 }: PhasePageTemplateProps) {
-    const { phase, artifact, loading, running, isRunnable, handleRun } = usePhase(sessionId, phaseNum);
+    const { phase, artifact, loading, running, refining, isRunnable, handleRun, handleRefine } = usePhase(sessionId, phaseNum);
+    const [instructions, setInstructions] = useState("");
+    const [dialogOpen, setDialogOpen] = useState(false);
+
+    const onRefineSubmit = async () => {
+        if (instructions.trim()) {
+            await handleRefine(instructions);
+        } else {
+            await handleRun();
+        }
+        setDialogOpen(false);
+        setInstructions("");
+    };
 
     if (loading || !phase) {
         return <div className="animate-pulse space-y-4">
@@ -51,20 +74,74 @@ export function PhasePageTemplate({
                     <div className="flex items-center gap-3">
                         <StatusBadge status={phase.status} />
                         {isRunnable && (
-                            <Button
-                                onClick={handleRun}
-                                disabled={running || phase.status === "running"}
-                                size="sm"
-                                variant={phase.status === "completed" ? "secondary" : "default"}
-                            >
-                                {running || phase.status === "running" ? (
-                                    <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Running...</>
-                                ) : phase.status === "completed" ? (
-                                    <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
-                                ) : (
-                                    <><Play className="w-4 h-4 mr-2" /> Start Phase</>
-                                )}
-                            </Button>
+                            phase.status === "completed" ? (
+                                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                                    <DialogTrigger 
+                                        render={
+                                            <Button
+                                                disabled={running || refining}
+                                                size="sm"
+                                                variant="secondary"
+                                            />
+                                        }
+                                    >
+                                        {(running || refining) ? (
+                                            <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Running...</>
+                                        ) : (
+                                            <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
+                                        )}
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Re-run or Refine Artifact</DialogTitle>
+                                            <DialogDescription>
+                                                (Optional) Provide instructions to guide the LLM on exactly what to change.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <Textarea
+                                            placeholder="E.g., Add a 'User' entity..."
+                                            value={instructions}
+                                            onChange={(e) => setInstructions(e.target.value)}
+                                            disabled={refining}
+                                            className="min-h-[100px] resize-y"
+                                        />
+                                        <DialogFooter>
+                                            <Button 
+                                                variant="outline" 
+                                                onClick={() => setDialogOpen(false)}
+                                                disabled={refining}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button 
+                                                onClick={onRefineSubmit}
+                                                disabled={refining}
+                                            >
+                                                {refining ? (
+                                                    <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Refining...</>
+                                                ) : instructions.trim() ? (
+                                                    <><Sparkles className="w-4 h-4 mr-2" /> Refine Artifact</>
+                                                ) : (
+                                                    <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
+                                                )}
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            ) : (
+                                <Button
+                                    onClick={handleRun}
+                                    disabled={running || refining || phase.status === "running"}
+                                    size="sm"
+                                    variant="default"
+                                >
+                                    {running || phase.status === "running" ? (
+                                        <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Running...</>
+                                    ) : (
+                                        <><Play className="w-4 h-4 mr-2" /> Start Phase</>
+                                    )}
+                                </Button>
+                            )
                         )}
                     </div>
                 </div>

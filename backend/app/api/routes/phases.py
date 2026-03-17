@@ -21,6 +21,7 @@ from api.schemas import (
     ArtifactVersionSummary,
     RunPhaseRequest,
     RunPhaseResponse,
+    RefinePhaseRequest,
     UpdateArtifactRequest,
     UpdateArtifactResponse,
     ValidationResponse,
@@ -130,6 +131,116 @@ def run_phase(
                 phase_name=phase.name,
                 status="failed",
                 version=db_artifact.version,
+                source="llm",
+                error=raw_or_error,
+            )
+
+    except (ValueError, ConnectionError) as e:
+        repo.create_artifact_version(
+            session_id=session.id,
+            phase_id=phase.id,
+            source="llm",
+            status="failed",
+            error=str(e),
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{phase_id}/refine", response_model=RunPhaseResponse)
+def refine_phase(
+    session_id: str,
+    phase_id: str,
+    request: RefinePhaseRequest,
+    repo: SessionRepository = Depends(get_repository),
+) -> RunPhaseResponse:
+    """
+    Refine an existing pipeline phase artifact via LLM using human instructions.
+
+    Creates a new artifact version with source='llm'.
+    Requires an existing artifact for this phase to be present.
+    """
+    session = repo.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    phase = get_phase_config(phase_id)
+    if phase is None:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found")
+
+    # Get the latest artifact for this phase to refine
+    db_artifact = repo.get_latest_artifact(session_id, phase_id)
+    if db_artifact is None or db_artifact.content is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot refine phase '{phase.name}' because it has not been run yet.",
+        )
+
+    # Check prerequisites using latest artifacts (same as run_phase)
+    latest_artifacts = repo.get_latest_artifacts(session_id)
+    prereq_error = check_phase_prerequisites(latest_artifacts, phase)
+    if prereq_error:
+        raise HTTPException(status_code=409, detail=prereq_error)
+
+    try:
+        # Build services
+        llm_service = LLMService(
+            provider=session.provider,
+            model=session.model,
+            temperature=session.temperature,
+        )
+        pipeline = PipelineService(
+            llm_service=llm_service,
+            validation_engine=ValidationEngine(),
+        )
+
+        # Build workflow state from latest artifacts
+        state = build_workflow_state(session, latest_artifacts, phase)
+
+        # Execute Refinement
+        artifact, raw_or_error, report = pipeline.run_phase(
+            phase,
+            state,
+            max_retries=request.max_retries,
+            instructions=request.instructions,
+            current_artifact=db_artifact.content,
+        )
+
+        if artifact is not None:
+            artifact_dict = json.loads(artifact.model_dump_json())
+            report_dict = json.loads(report.model_dump_json()) if report else None
+
+            new_db_artifact = repo.create_artifact_version(
+                session_id=session.id,
+                phase_id=phase.id,
+                source="llm",  # Source is LLM because it generated the response, even if guided by human
+                status="completed",
+                content=artifact_dict,
+                validation_report=report_dict,
+            )
+
+            return RunPhaseResponse(
+                phase_id=phase.id,
+                phase_name=phase.name,
+                status="completed",
+                version=new_db_artifact.version,
+                source="llm",
+                artifact=artifact_dict,
+                validation=report_dict,
+            )
+        else:
+            new_db_artifact = repo.create_artifact_version(
+                session_id=session.id,
+                phase_id=phase.id,
+                source="llm",
+                status="failed",
+                error=raw_or_error,
+            )
+
+            return RunPhaseResponse(
+                phase_id=phase.id,
+                phase_name=phase.name,
+                status="failed",
+                version=new_db_artifact.version,
                 source="llm",
                 error=raw_or_error,
             )

@@ -41,6 +41,11 @@ export interface CreateSessionRequest {
     temperature: number;
 }
 
+export interface RefinePhaseRequest {
+    instructions: string;
+    max_retries?: number;
+}
+
 export interface RunPhaseResponse {
     phase_id: string;
     phase_name: string;
@@ -135,6 +140,23 @@ export async function runPhase(
         {
             method: "POST",
             body: JSON.stringify({ max_retries: maxRetries }),
+        },
+    );
+}
+
+export async function refinePhase(
+    sessionId: string,
+    phaseId: string,
+    req: RefinePhaseRequest,
+): Promise<RunPhaseResponse> {
+    return apiFetch<RunPhaseResponse>(
+        `/sessions/${sessionId}/phases/${phaseId}/refine`,
+        {
+            method: "POST",
+            body: JSON.stringify({
+                instructions: req.instructions,
+                max_retries: req.max_retries ?? 2,
+            }),
         },
     );
 }
