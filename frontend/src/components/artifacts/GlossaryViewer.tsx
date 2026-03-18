@@ -61,6 +61,7 @@ const CATEGORY_LABELS: Record<GlossaryTerm["category"], string> = {
 
 export function GlossaryViewer({ data }: { data: GlossaryArtifact }) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [showOnlyAmbiguous, setShowOnlyAmbiguous] = useState(false);
   const [hintsOpen, setHintsOpen] = useState(false);
 
   // Count terms per category for filter badges
@@ -72,13 +73,16 @@ export function GlossaryViewer({ data }: { data: GlossaryArtifact }) {
     return counts;
   }, [data.terms]);
 
-  const filteredTerms = useMemo(
-    () =>
-      activeCategory
-        ? data.terms.filter((t) => t.category === activeCategory)
-        : data.terms,
-    [data.terms, activeCategory],
-  );
+  const filteredTerms = useMemo(() => {
+    let result = data.terms;
+    if (activeCategory) {
+      result = result.filter((t) => t.category === activeCategory);
+    }
+    if (showOnlyAmbiguous) {
+      result = result.filter((t) => t.is_ambiguous);
+    }
+    return result;
+  }, [data.terms, activeCategory, showOnlyAmbiguous]);
 
   const ambiguousCount = data.terms.filter((t) => t.is_ambiguous).length;
 
@@ -95,27 +99,53 @@ export function GlossaryViewer({ data }: { data: GlossaryArtifact }) {
         )}
       </div>
 
-      {/* Category filter bar */}
-      <div className="flex flex-wrap gap-1.5">
-        <Badge
-          variant={activeCategory === null ? "default" : "outline"}
-          className="cursor-pointer text-xs"
-          onClick={() => setActiveCategory(null)}
-        >
-          All ({data.terms.length})
-        </Badge>
-        {Object.entries(categoryCounts).map(([cat, count]) => (
+      {/* Filters bar */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs font-semibold text-muted-foreground mr-1 hidden sm:inline-block">Category:</span>
           <Badge
-            key={cat}
-            variant="outline"
-            className={`cursor-pointer text-xs ${
-              activeCategory === cat ? CATEGORY_COLORS[cat as GlossaryTerm["category"]] : ""
-            }`}
-            onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+            variant={activeCategory === null ? "default" : "outline"}
+            className="cursor-pointer text-xs"
+            onClick={() => setActiveCategory(null)}
           >
-            {CATEGORY_LABELS[cat as GlossaryTerm["category"]]} ({count})
+            All ({data.terms.length})
           </Badge>
-        ))}
+          {Object.entries(categoryCounts).map(([cat, count]) => (
+            <Badge
+              key={cat}
+              variant="outline"
+              className={`cursor-pointer text-xs ${
+                activeCategory === cat ? CATEGORY_COLORS[cat as GlossaryTerm["category"]] : ""
+              }`}
+              onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+            >
+              {CATEGORY_LABELS[cat as GlossaryTerm["category"]]} ({count})
+            </Badge>
+          ))}
+        </div>
+
+        {ambiguousCount > 0 && (
+          <div className="flex flex-wrap gap-2 items-center sm:border-l sm:pl-4 border-muted">
+            <span className="text-xs font-semibold text-muted-foreground hidden sm:inline-block">Status:</span>
+            <Badge
+              variant={showOnlyAmbiguous ? "default" : "outline"}
+              className={`cursor-pointer text-xs ${
+                showOnlyAmbiguous 
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-transparent" 
+                  : "text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
+              }`}
+              onClick={() => setShowOnlyAmbiguous(!showOnlyAmbiguous)}
+            >
+              <AlertTriangle className="h-3 w-3 mr-1.5" />
+              Ambiguous Only
+            </Badge>
+            {showOnlyAmbiguous && (
+                <span className="text-xs text-muted-foreground">
+                    Showing {filteredTerms.length} of {ambiguousCount}
+                </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Terms table */}
