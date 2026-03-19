@@ -18,7 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Box, ChevronDown, Layers, ShieldCheck } from "lucide-react";
+import { Box, ChevronDown, Layers, Command } from "lucide-react";
 import type { AggregatesArtifact, Aggregate } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -100,36 +100,12 @@ function AggregateCard({ agg }: { agg: Aggregate }) {
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Invariants */}
-        {agg.invariants.length > 0 && (
-          <Collapsible>
-            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-              <ChevronDown className="h-3 w-3" />
-              <ShieldCheck className="h-3 w-3" />
-              Invariants ({agg.invariants.length})
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 space-y-1 pl-5">
-              {agg.invariants.map((inv) => (
-                <Tooltip key={inv.name}>
-                  <TooltipTrigger className="text-left">
-                    <Badge variant="outline" className="text-xs bg-purple-500/15 text-purple-400 border-purple-500/30">
-                      {inv.name}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs">{inv.description}</p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
         {/* Commands */}
         {agg.commands.length > 0 && (
           <Collapsible>
             <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
               <ChevronDown className="h-3 w-3" />
+              <Command className="h-3 w-3" /> 
               Commands ({agg.commands.length})
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-2 pl-5">
@@ -166,13 +142,47 @@ function AggregateCard({ agg }: { agg: Aggregate }) {
 
         {/* Domain events summary */}
         {agg.domain_events.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
-            {agg.domain_events.map((e) => (
-              <Badge key={e} variant="outline" className="text-xs bg-orange-500/15 text-orange-400 border-orange-500/30">
-                {e}
-              </Badge>
-            ))}
-          </div>
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <ChevronDown className="h-3 w-3" />
+              Events Summary ({agg.domain_events.length})
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 pl-5">
+              <div className="flex flex-wrap gap-1">
+                {agg.domain_events.map((e) => (
+                  <Badge key={e} variant="outline" className="text-xs bg-orange-500/15 text-orange-400 border-orange-500/30">
+                    {e}
+                  </Badge>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Invariants */}
+        {agg.invariants.length > 0 && (
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <ChevronDown className="h-3 w-3" />
+              Invariants Summary ({agg.invariants.length})
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-1 pl-5">
+              {agg.invariants.map((inv) => (
+                <div key={inv.name}>
+                  <Tooltip>
+                    <TooltipTrigger className="text-left w-full sm:w-auto">
+                      <Badge variant="outline" className="text-xs bg-purple-500/15 text-purple-400 border-purple-500/30 max-w-full text-left font-normal shrink-0">
+                        {inv.name}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">{inv.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
         )}
       </CardContent>
     </Card>
@@ -206,15 +216,21 @@ export function AggregatesViewer({ data }: { data: AggregatesArtifact }) {
       {/* Legend */}
       <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-md border text-xs">
         <span className="font-semibold flex items-center">Legend:</span>
-        <div className="flex items-center gap-2 border-r pr-4 border-border">
+        <div className="flex flex-wrap items-center gap-2 border-r pr-4 border-border">
           <span className="flex items-center gap-1"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-blue-500/15 text-blue-400 border-blue-500/30">E</Badge> Entity</span>
           <span className="flex items-center gap-1"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-teal-500/15 text-teal-400 border-teal-500/30">VO</Badge> Value Object</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-r pr-4 border-border">
           <span className="text-muted-foreground mr-1">Evaluation:</span>
           <span className="flex items-center"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-green-500/15 text-green-400 border-green-500/30">small</Badge></span>
           <span className="flex items-center"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-yellow-500/15 text-yellow-400 border-yellow-500/30">moderate</Badge></span>
           <span className="flex items-center"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-red-500/15 text-red-400 border-red-500/30">large</Badge></span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground mr-1">Property Badges:</span>
+          <span className="flex items-center gap-1"><span className="text-[10px] font-mono bg-muted px-1 rounded text-muted-foreground flex items-center h-4">Param</span> Input Parameter</span>
+          <span className="flex items-center gap-1"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-orange-500/15 text-orange-400 border-orange-500/30">Event</Badge> Domain Event</span>
+          <span className="flex items-center gap-1"><Badge variant="outline" className="text-[10px] h-4 px-1 bg-purple-500/15 text-purple-400 border-purple-500/30">Rule</Badge> Invariant Rule</span>
         </div>
       </div>
 
