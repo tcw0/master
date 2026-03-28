@@ -213,6 +213,20 @@ export function AggregatesViewer({ data }: { data: AggregatesArtifact }) {
         <span>{grouped.size} bounded contexts</span>
       </div>
 
+      {/* Design decisions */}
+      {data.design_decisions.length > 0 && (
+        <div className="space-y-2 pb-2">
+          <h4 className="text-sm font-semibold">Design Decisions</h4>
+          <ul className="space-y-1">
+            {data.design_decisions.map((d, i) => (
+              <li key={i} className="text-xs text-muted-foreground pl-4 relative before:content-['•'] before:absolute before:left-0">
+                {d}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-md border text-xs">
         <span className="font-semibold flex items-center">Legend:</span>
@@ -247,20 +261,6 @@ export function AggregatesViewer({ data }: { data: AggregatesArtifact }) {
           </div>
         </div>
       ))}
-
-      {/* Design decisions */}
-      {data.design_decisions.length > 0 && (
-        <div className="space-y-2 pt-2 border-t border-border">
-          <h4 className="text-sm font-semibold">Design Decisions</h4>
-          <ul className="space-y-1">
-            {data.design_decisions.map((d, i) => (
-              <li key={i} className="text-xs text-muted-foreground pl-4 relative before:content-['•'] before:absolute before:left-0">
-                {d}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

@@ -99,6 +99,21 @@ export function EventStormingViewer({ data }: { data: EventStormingArtifact }) {
         <span>{data.flows.length} flows</span>
       </div>
 
+      {/* Ambiguities */}
+      {data.ambiguities && data.ambiguities.length > 0 && (
+        <div className="space-y-2 pb-2">
+          <h4 className="text-sm font-semibold flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+            Ambiguities ({data.ambiguities.length})
+          </h4>
+          <div className="space-y-1">
+            {data.ambiguities.map((a, i) => (
+              <p key={i} className="text-xs text-muted-foreground pl-5">• {a}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="flows">
         <TabsList>
           <TabsTrigger value="flows">Flows</TabsTrigger>
@@ -235,21 +250,6 @@ export function EventStormingViewer({ data }: { data: EventStormingArtifact }) {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Ambiguities */}
-      {data.ambiguities && data.ambiguities.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
-            Ambiguities ({data.ambiguities.length})
-          </h4>
-          <div className="space-y-1">
-            {data.ambiguities.map((a, i) => (
-              <p key={i} className="text-xs text-muted-foreground pl-5">• {a}</p>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
