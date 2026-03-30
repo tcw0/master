@@ -216,6 +216,7 @@ def refine_phase(
                 status="completed",
                 content=artifact_dict,
                 validation_report=report_dict,
+                instructions=request.instructions,
             )
 
             return RunPhaseResponse(
@@ -226,6 +227,7 @@ def refine_phase(
                 source="llm",
                 artifact=artifact_dict,
                 validation=report_dict,
+                instructions=new_db_artifact.instructions,
             )
         else:
             new_db_artifact = repo.create_artifact_version(
@@ -289,6 +291,7 @@ def get_artifact(
         version=db_artifact.version,
         source=db_artifact.source,
         artifact=db_artifact.content,
+        instructions=db_artifact.instructions,
     )
 
 
@@ -345,6 +348,7 @@ def update_artifact(
         source="human",
         artifact=artifact_dict,
         validation=validation_dict,
+        instructions=db_artifact.instructions,
     )
 
 
@@ -374,6 +378,7 @@ def get_artifact_history(
                 source=v.source,
                 status=v.status,
                 created_at=v.created_at.isoformat(),
+                instructions=v.instructions,
             )
             for v in versions
         ],

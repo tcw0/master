@@ -77,6 +77,7 @@ class Artifact(Base):
     status = Column(String(20), nullable=False, default="completed")
     content = Column(JSONB, nullable=True)
     validation_report = Column(JSONB, nullable=True)
+    instructions = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utc_now)
 

@@ -107,6 +107,7 @@ class RunPhaseResponse(BaseModel):
     source: str
     artifact: dict | None = None
     validation: dict | None = None
+    instructions: str | None = None
     error: str | None = None
 
 
@@ -122,6 +123,7 @@ class ArtifactResponse(BaseModel):
     version: int
     source: str
     artifact: dict
+    instructions: str | None = None
 
 
 class ArtifactVersionSummary(BaseModel):
@@ -130,6 +132,7 @@ class ArtifactVersionSummary(BaseModel):
     source: str
     status: str
     created_at: str
+    instructions: str | None = None
 
 
 class ArtifactHistoryResponse(BaseModel):
@@ -154,6 +157,7 @@ class UpdateArtifactResponse(BaseModel):
     source: str
     artifact: dict
     validation: dict | None = None
+    instructions: str | None = None
 
 
 # =============================================================================

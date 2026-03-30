@@ -121,6 +121,7 @@ class SessionRepository:
         status: str = "completed",
         content: dict | None = None,
         validation_report: dict | None = None,
+        instructions: str | None = None,
         error: str | None = None,
     ) -> Artifact:
         """
@@ -140,6 +141,7 @@ class SessionRepository:
             status=status,
             content=content,
             validation_report=validation_report,
+            instructions=instructions,
             error=error,
         )
         self.db.add(artifact)

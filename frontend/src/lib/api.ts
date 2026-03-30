@@ -54,6 +54,7 @@ export interface RunPhaseResponse {
     source: string;
     artifact: Record<string, unknown> | null;
     validation: Record<string, unknown> | null;
+    instructions?: string | null;
     error: string | null;
 }
 
@@ -63,6 +64,7 @@ export interface ArtifactResponse {
     version: number;
     source: string;
     artifact: Record<string, unknown>;
+    instructions?: string | null;
 }
 
 export interface ArtifactVersionSummary {
@@ -70,6 +72,7 @@ export interface ArtifactVersionSummary {
     source: string;
     status: string;
     created_at: string;
+    instructions?: string | null;
 }
 
 export interface ArtifactHistoryResponse {
