@@ -33,14 +33,24 @@ export default function SessionLayout({
         getSession(params.id).then(setSession).catch(console.error);
     }, [params.id]);
 
-    // Simple polling to keep the sidebar updated if a background process is running
-    // or if the user ran a phase on a subpage
+    // Smart polling to keep the sidebar updated:
+    // 1. Never poll if the tab is in the background (saves extreme compute if tab left open)
+    // 2. Poll every 5s if a phase is currently running, otherwise every 30s to conserve the Vercel free tier
+    const hasRunningPhase = session?.phases?.some(p => p.status === "running");
+
     useEffect(() => {
-        const interval = setInterval(() => {
+        let interval: NodeJS.Timeout;
+
+        const checkSession = () => {
+            if (document.visibilityState !== "visible") return;
             getSession(params.id).then(setSession).catch(console.error);
-        }, 5000);
+        };
+
+        const pollFrequency = hasRunningPhase ? 5000 : 30000;
+        interval = setInterval(checkSession, pollFrequency);
+
         return () => clearInterval(interval);
-    }, [params.id]);
+    }, [params.id, hasRunningPhase]);
 
     if (!session) {
         return (
