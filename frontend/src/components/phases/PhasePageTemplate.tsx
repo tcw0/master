@@ -179,7 +179,12 @@ export function PhasePageTemplate({
                         <p className="text-xs mt-2 text-muted-foreground">Check the logs or try running it again.</p>
                     </div>
                 ) : artifact ? (
-                    <ArtifactViewer phaseId={phase.phase_id} artifact={artifact.artifact} />
+                    <ArtifactViewer 
+                        phaseId={phase.phase_id} 
+                        artifact={artifact.artifact} 
+                        sessionId={sessionId}
+                        phaseNum={phaseNum}
+                    />
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground border rounded-lg bg-muted/10 border-dashed">
                         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">

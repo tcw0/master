@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Code, LayoutDashboard } from "lucide-react";
+import { Code, LayoutDashboard, Download } from "lucide-react";
 
 import { JsonFallback } from "./JsonFallback";
 import { GlossaryViewer } from "./GlossaryViewer";
@@ -26,11 +26,28 @@ import type {
 export function ArtifactViewer({
   phaseId,
   artifact,
+  sessionId,
+  phaseNum,
 }: {
   phaseId: string;
   artifact: Record<string, unknown>;
+  sessionId: string;
+  phaseNum: number;
 }) {
   const [showJson, setShowJson] = useState(false);
+
+  const handleDownloadJson = () => {
+    const jsonStr = JSON.stringify(artifact, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `session_${sessionId}_phase_${phaseNum}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   function renderViewer() {
     switch (phaseId) {
@@ -51,7 +68,16 @@ export function ArtifactViewer({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDownloadJson}
+          className="gap-1.5 text-xs text-muted-foreground"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Download JSON
+        </Button>
         <Button
           variant="ghost"
           size="sm"
