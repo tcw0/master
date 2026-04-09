@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AlertCircle, CheckCircle2, Circle, Play, RotateCw, Sparkles } from "lucide-react";
+import { useState, useRef } from "react";
+import { AlertCircle, CheckCircle2, Circle, Play, RotateCw, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -44,9 +44,20 @@ export function PhasePageTemplate({
     title,
     description,
 }: PhasePageTemplateProps) {
-    const { phase, artifact, loading, running, refining, isRunnable, handleRun, handleRefine } = usePhase(sessionId, phaseNum);
+    const { phase, artifact, loading, running, refining, uploading, isRunnable, handleRun, handleRefine, handleUploadArtifact } = usePhase(sessionId, phaseNum);
     const [instructions, setInstructions] = useState("");
     const [dialogOpen, setDialogOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            await handleUploadArtifact(file);
+        }
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
 
     const onRefineSubmit = async () => {
         if (instructions.trim()) {
@@ -75,74 +86,109 @@ export function PhasePageTemplate({
                         <StatusBadge status={phase.status} />
                         {isRunnable && (
                             phase.status === "completed" ? (
-                                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                                    <DialogTrigger 
-                                        render={
-                                            <Button
-                                                disabled={running || refining}
-                                                size="sm"
-                                                variant="secondary"
+                                <div className="flex items-center gap-2">
+                                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                                        <DialogTrigger 
+                                            render={
+                                                <Button
+                                                    disabled={running || refining || uploading}
+                                                    size="sm"
+                                                    variant="secondary"
+                                                />
+                                            }
+                                        >
+                                            {(running || refining) ? (
+                                                <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Running...</>
+                                            ) : (
+                                                <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
+                                            )}
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Re-run or Refine Artifact</DialogTitle>
+                                                <DialogDescription>
+                                                    (Optional) Provide instructions to guide the LLM on exactly what to change.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <Textarea
+                                                placeholder="E.g., Add a 'User' entity..."
+                                                value={instructions}
+                                                onChange={(e) => setInstructions(e.target.value)}
+                                                disabled={refining || uploading}
+                                                className="min-h-[100px] resize-y"
                                             />
-                                        }
+                                            <DialogFooter>
+                                                <Button 
+                                                    variant="outline" 
+                                                    onClick={() => setDialogOpen(false)}
+                                                    disabled={refining || uploading}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={onRefineSubmit}
+                                                    disabled={refining || uploading}
+                                                >
+                                                    {refining ? (
+                                                        <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Refining...</>
+                                                    ) : instructions.trim() ? (
+                                                        <><Sparkles className="w-4 h-4 mr-2" /> Refine Artifact</>
+                                                    ) : (
+                                                        <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
+                                                    )}
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                    <Button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={running || refining || uploading}
+                                        size="sm"
+                                        variant="outline"
                                     >
-                                        {(running || refining) ? (
+                                        {uploading ? (
+                                            <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                                        ) : (
+                                            <><Upload className="w-4 h-4 mr-2" /> Upload JSON</>
+                                        )}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        onClick={handleRun}
+                                        disabled={running || refining || uploading || phase.status === "running"}
+                                        size="sm"
+                                        variant="default"
+                                    >
+                                        {running || phase.status === "running" ? (
                                             <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Running...</>
                                         ) : (
-                                            <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
+                                            <><Play className="w-4 h-4 mr-2" /> Start Phase</>
                                         )}
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Re-run or Refine Artifact</DialogTitle>
-                                            <DialogDescription>
-                                                (Optional) Provide instructions to guide the LLM on exactly what to change.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <Textarea
-                                            placeholder="E.g., Add a 'User' entity..."
-                                            value={instructions}
-                                            onChange={(e) => setInstructions(e.target.value)}
-                                            disabled={refining}
-                                            className="min-h-[100px] resize-y"
-                                        />
-                                        <DialogFooter>
-                                            <Button 
-                                                variant="outline" 
-                                                onClick={() => setDialogOpen(false)}
-                                                disabled={refining}
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button 
-                                                onClick={onRefineSubmit}
-                                                disabled={refining}
-                                            >
-                                                {refining ? (
-                                                    <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Refining...</>
-                                                ) : instructions.trim() ? (
-                                                    <><Sparkles className="w-4 h-4 mr-2" /> Refine Artifact</>
-                                                ) : (
-                                                    <><RotateCw className="w-4 h-4 mr-2" /> Re-run Phase</>
-                                                )}
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            ) : (
-                                <Button
-                                    onClick={handleRun}
-                                    disabled={running || refining || phase.status === "running"}
-                                    size="sm"
-                                    variant="default"
-                                >
-                                    {running || phase.status === "running" ? (
-                                        <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Running...</>
-                                    ) : (
-                                        <><Play className="w-4 h-4 mr-2" /> Start Phase</>
-                                    )}
-                                </Button>
+                                    </Button>
+                                    <Button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={running || refining || uploading || phase.status === "running"}
+                                        size="sm"
+                                        variant="outline"
+                                    >
+                                        {uploading ? (
+                                            <><RotateCw className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                                        ) : (
+                                            <><Upload className="w-4 h-4 mr-2" /> Upload JSON</>
+                                        )}
+                                    </Button>
+                                </div>
                             )
                         )}
+                        <input 
+                            type="file" 
+                            accept=".json" 
+                            className="hidden" 
+                            ref={fileInputRef} 
+                            onChange={onFileChange} 
+                        />
                     </div>
                 </div>
 

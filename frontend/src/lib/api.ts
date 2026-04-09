@@ -46,6 +46,20 @@ export interface RefinePhaseRequest {
     max_retries?: number;
 }
 
+export interface UpdateArtifactRequest {
+    artifact: Record<string, unknown>;
+}
+
+export interface UpdateArtifactResponse {
+    phase_id: string;
+    phase_name: string;
+    version: number;
+    source: string;
+    artifact: Record<string, unknown>;
+    validation: Record<string, unknown> | null;
+    instructions?: string | null;
+}
+
 export interface RunPhaseResponse {
     phase_id: string;
     phase_name: string;
@@ -160,6 +174,20 @@ export async function refinePhase(
                 instructions: req.instructions,
                 max_retries: req.max_retries ?? 2,
             }),
+        },
+    );
+}
+
+export async function updateArtifact(
+    sessionId: string,
+    phaseId: string,
+    req: UpdateArtifactRequest,
+): Promise<UpdateArtifactResponse> {
+    return apiFetch<UpdateArtifactResponse>(
+        `/sessions/${sessionId}/phases/${phaseId}/artifact`,
+        {
+            method: "PUT",
+            body: JSON.stringify(req),
         },
     );
 }

@@ -5,6 +5,7 @@ import {
     runPhase,
     refinePhase,
     getArtifact,
+    updateArtifact,
     type Session,
     type PhaseStatus,
     type ArtifactResponse,
@@ -16,6 +17,7 @@ export function usePhase(sessionId: string, phaseNum: number) {
     const [artifact, setArtifact] = useState<ArtifactResponse | null>(null);
     const [running, setRunning] = useState(false);
     const [refining, setRefining] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const loadData = useCallback(async () => {
@@ -94,6 +96,28 @@ export function usePhase(sessionId: string, phaseNum: number) {
         }
     };
 
+    const handleUploadArtifact = async (file: File) => {
+        if (!phase) return;
+        setUploading(true);
+        try {
+            const text = await file.text();
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                throw new Error("Invalid JSON file uploaded. Please ensure the file contains valid JSON format.");
+            }
+            
+            await updateArtifact(sessionId, phase.phase_id, { artifact: parsed });
+            toast.success(`${phase.phase_name} updated successfully from JSON`);
+            await loadData();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Upload failed");
+        } finally {
+            setUploading(false);
+        }
+    };
+
     return {
         session,
         phase,
@@ -101,9 +125,11 @@ export function usePhase(sessionId: string, phaseNum: number) {
         loading,
         running,
         refining,
+        uploading,
         isRunnable,
         handleRun,
         handleRefine,
+        handleUploadArtifact,
         refresh: loadData
     };
 }
