@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, FileText, Trash2, GitPullRequest } from "lucide-react";
+import { Loader2, FileText, Trash2, GitPullRequest, Info, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 import { createSession, listSessions, deleteSession, type Session } from "@/lib/api";
 import { useEffect } from "react";
@@ -101,6 +106,25 @@ export default function HomePage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="requirements">Requirements</Label>
+              <Collapsible className="w-full mb-2 border rounded-md px-4 group/collapsible bg-muted/20">
+                <CollapsibleTrigger className="group/collapsible-trigger flex w-full items-center justify-between text-sm font-medium py-3 outline-none hover:underline">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    Guidance
+                  </div>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/collapsible-trigger:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="text-sm text-muted-foreground pb-4 pt-1">
+                  <p className="mb-2">To get the best DDD artifacts, your requirements should ideally include:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li><strong>Product Vision & Overview:</strong> What is the system and who is it for?</li>
+                    <li><strong>Actors & Roles:</strong> Who uses the system (e.g., Guests, Regular Users, Admins) and what are their differing permissions?</li>
+                    <li><strong>Core Workflows & Use Cases:</strong> Step-by-step descriptions of main user journeys (e.g., How does a user register? How is a file shared?).</li>
+                    <li><strong>Business Rules & Policies:</strong> Crucial constraints, security guidelines (e.g., encryption limits), or compliance rules (e.g., automatic deletion).</li>
+                    <li><strong>Administrative & Technical Functions:</strong> How is the system managed and monitored behind the scenes?</li>
+                  </ul>
+                </CollapsibleContent>
+              </Collapsible>
               <Textarea
                 id="requirements"
                 placeholder="Paste your requirements document here..."
