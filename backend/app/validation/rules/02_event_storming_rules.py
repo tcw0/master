@@ -16,7 +16,7 @@ from validation.models import ValidationResult, ValidationSeverity
     rule_id="events.no_duplicate_event_names",
     phase="02_event_storming",
     description="No two domain events should share the same name (case-insensitive)",
-    severity_on_fail=ValidationSeverity.FAILURE,
+    severity_on_fail=ValidationSeverity.WARNING,
 )
 def no_duplicate_event_names(artifacts: dict[str, BaseModel]) -> list[ValidationResult]:
     """
@@ -40,7 +40,7 @@ def no_duplicate_event_names(artifacts: dict[str, BaseModel]) -> list[Validation
             results.append(
                 ValidationResult(
                     rule_id="events.no_duplicate_event_names",
-                    severity=ValidationSeverity.FAILURE,
+                    severity=ValidationSeverity.WARNING,
                     phase="02_event_storming",
                     message=f"Duplicate domain event '{name}' appears {count} times",
                     source_element=name,
@@ -58,3 +58,47 @@ def no_duplicate_event_names(artifacts: dict[str, BaseModel]) -> list[Validation
         )
 
     return results
+
+
+@validation_rule(
+    rule_id="events.flow_step_completeness",
+    phase="02_event_storming",
+    description="Every step in a flow must have an event and an aggregate",
+    severity_on_fail=ValidationSeverity.WARNING,
+)
+def flow_step_completeness(artifacts: dict[str, BaseModel]) -> list[ValidationResult]:
+    events_artifact = artifacts.get("events")
+    if events_artifact is None:
+        return []
+
+    results: list[ValidationResult] = []
+    incomplete_steps = []
+
+    for flow in events_artifact.flows:
+        for i, step in enumerate(flow.steps):
+            if not step.event or not step.aggregate:
+                incomplete_steps.append((flow.name, i))
+
+    if incomplete_steps:
+        for flow_name, step_idx in incomplete_steps:
+            results.append(
+                ValidationResult(
+                    rule_id="events.flow_step_completeness",
+                    severity=ValidationSeverity.WARNING,
+                    phase="02_event_storming",
+                    message=f"Flow '{flow_name}' has incomplete step at index {step_idx} (missing event or aggregate)",
+                    source_element=flow_name,
+                    suggestion="Ensure every step defines both an event and an aggregate",
+                )
+            )
+    else:
+        results.append(
+            ValidationResult(
+                rule_id="events.flow_step_completeness",
+                severity=ValidationSeverity.PASS,
+                phase="02_event_storming",
+                message="All flow steps have an event and aggregate",
+            )
+        )
+    return results
+

@@ -12,8 +12,10 @@ Core HITL workflow:
 
 import json
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from api.schemas import (
     ArtifactHistoryResponse,
@@ -37,6 +39,7 @@ from db.repository import SessionRepository
 from services.llm_service import LLMService
 from services.pipeline_service import PipelineService
 from validation import ValidationEngine
+from validation.models import ValidationReport
 
 logger = logging.getLogger(__name__)
 
@@ -90,9 +93,27 @@ def run_phase(
         # Build workflow state from latest artifacts
         state = build_workflow_state(session, latest_artifacts, phase)
 
+        def handle_discarded(attempt: int, artifact_obj: BaseModel | None, raw: str | None, rep: ValidationReport | None, error: str | None) -> None:
+            artifact_dict = json.loads(artifact_obj.model_dump_json()) if artifact_obj else None
+            report_dict = json.loads(rep.model_dump_json()) if rep else None
+            
+            if not error and rep and rep.has_failures():
+                error = f"Semantic Validation Failed: {rep.failure_count} errors"
+                
+            repo.create_artifact_version(
+                session_id=session.id,
+                phase_id=phase.id,
+                source="llm",
+                status="failed_validation" if artifact_obj else "failed_parsing",
+                content=artifact_dict,
+                validation_report=report_dict,
+                error=error or (raw if not artifact_dict else None)
+            )
+
         # Execute
         artifact, raw_or_error, report = pipeline.run_phase(
             phase, state, max_retries=request.max_retries,
+            on_attempt_discarded=handle_discarded,
         )
 
         if artifact is not None:
@@ -196,6 +217,24 @@ def refine_phase(
         # Build workflow state from latest artifacts
         state = build_workflow_state(session, latest_artifacts, phase)
 
+        def handle_discarded(attempt: int, artifact_obj: BaseModel | None, raw: str | None, rep: ValidationReport | None, error: str | None) -> None:
+            artifact_dict = json.loads(artifact_obj.model_dump_json()) if artifact_obj else None
+            report_dict = json.loads(rep.model_dump_json()) if rep else None
+            
+            if not error and rep and rep.has_failures():
+                error = f"Semantic Validation Failed: {rep.failure_count} errors"
+                
+            repo.create_artifact_version(
+                session_id=session.id,
+                phase_id=phase.id,
+                source="llm",
+                status="failed_validation" if artifact_obj else "failed_parsing",
+                content=artifact_dict,
+                validation_report=report_dict,
+                instructions=request.instructions,
+                error=error or (raw if not artifact_dict else None)
+            )
+
         # Execute Refinement
         artifact, raw_or_error, report = pipeline.run_phase(
             phase,
@@ -203,6 +242,7 @@ def refine_phase(
             max_retries=request.max_retries,
             instructions=request.instructions,
             current_artifact=db_artifact.content,
+            on_attempt_discarded=handle_discarded,
         )
 
         if artifact is not None:

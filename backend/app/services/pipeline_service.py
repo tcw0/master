@@ -168,6 +168,7 @@ class PipelineService:
         max_retries: int = 2,
         instructions: str | None = None,
         current_artifact: dict | None = None,
+        on_attempt_discarded: Callable[[int, BaseModel | None, str | None, ValidationReport | None, str | None], None] | None = None,
     ) -> tuple[BaseModel | None, str | None, ValidationReport | None]:
         """
         Execute a single phase with retry logic, optionally refining an existing one.
@@ -240,6 +241,8 @@ class PipelineService:
                             f"Attempt {attempt + 1}: {report.failure_count} "
                             f"validation failure(s). Retrying..."
                         )
+                        if on_attempt_discarded:
+                            on_attempt_discarded(attempt, artifact, raw_response, report, None)
                         continue  # consume a retry attempt
 
                     return artifact, raw_response, report
@@ -252,6 +255,8 @@ class PipelineService:
                     logger.warning(
                         f"Attempt {attempt + 1} failed: {last_error}. Retrying...",
                     )
+                    if on_attempt_discarded:
+                        on_attempt_discarded(attempt, None, raw_response, None, last_error)
                 else:
                     logger.error(
                         f"Phase {phase.id} failed after "

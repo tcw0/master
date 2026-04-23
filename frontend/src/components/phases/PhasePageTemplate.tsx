@@ -216,7 +216,6 @@ export function PhasePageTemplate({
                     <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground border rounded-lg bg-muted/10 border-dashed">
                         <RotateCw className="w-8 h-8 mb-4 animate-spin text-primary" />
                         <p>Generating {title.toLowerCase()}...</p>
-                        <p className="text-xs mt-2">This usually takes 10-30 seconds depending on the model.</p>
                     </div>
                 ) : phase.status === "failed" ? (
                     <div className="flex flex-col items-center justify-center h-[400px] text-destructive border-destructive/20 border rounded-lg bg-destructive/5">
